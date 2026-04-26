@@ -19,6 +19,7 @@
 #include "MCDPatch.h"
 #include "MapDataSet.h"
 #include "MapData.h"
+#include "../Engine/Palette.h"
 
 namespace OpenXcom
 {
@@ -133,6 +134,28 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 			int objectType = mcd["objectType"].readVal<int>();
 			_objectTypes.push_back(std::make_pair(MCDIndex, objectType));
 		}
+		if (mcd["lightSource"])
+		{
+			int lightSource = mcd["lightSource"].readVal<int>();
+			_lightSources.push_back(std::make_pair(MCDIndex, lightSource));
+		}
+		if (mcd["lightOffset"])
+		{
+			std::vector<int> offset = mcd["lightOffset"].readVal<std::vector<int> >();
+			if (offset.size() == 3)
+				_lightOffsets.push_back(std::make_pair(MCDIndex, offset));
+		}
+		if (mcd["lightColor"])
+		{
+			std::string hex = mcd["lightColor"].readVal<std::string>();
+			int r, g, b;
+			Palette::parseHexColor(hex, r, g, b);
+			std::vector<int> rgb;
+			rgb.push_back(r);
+			rgb.push_back(g);
+			rgb.push_back(b);
+			_lightColors.push_back(std::make_pair(MCDIndex, rgb));
+		}
 	}
 }
 
@@ -214,6 +237,24 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 			dataSet->getObject(pair.first)->setLoftID(loft, layer);
 			++layer;
 		}
+	}
+	for (const auto& pair : _lightSources)
+	{
+		dataSet->getObject(pair.first)->setModLightSource(pair.second);
+	}
+	for (const auto& pair : _lightOffsets)
+	{
+		const std::vector<int>& o = pair.second;
+		dataSet->getObject(pair.first)->setLightOffset(Position(o[0], o[1], o[2]));
+	}
+	for (const auto& pair : _lightColors)
+	{
+		const std::vector<int>& rgb = pair.second;
+		if (rgb.size() != 3) continue;
+		MapData* md = dataSet->getObject(pair.first);
+		md->setModLightColor(rgb[0], rgb[1], rgb[2]);
+		if (!md->hasModLightSource() && md->getLightSource() <= 0)
+			md->setModLightSource(1);
 	}
 }
 
