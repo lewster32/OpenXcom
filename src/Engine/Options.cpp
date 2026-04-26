@@ -52,6 +52,7 @@ std::vector<std::string> _userList;
 std::map<std::string, std::string> _commandLine;
 std::vector<OptionInfo> _info;
 std::vector<OptionPair> _pairings;
+std::vector<OptionGate> _gates;
 std::map<std::string, ModInfo> _modInfos;
 std::string _masterMod;
 int _passwordCheck = -1;
@@ -1428,6 +1429,15 @@ const std::vector<OptionInfo> &getOptionInfo()
 const std::vector<OptionPair> &getOptionPairings()
 {
 	return _pairings;
+}
+
+/**
+ * Returns the game's list of declared option gates.
+ * @return List of OptionGate entries.
+ */
+const std::vector<OptionGate> &getOptionGates()
+{
+	return _gates;
 }
 
 /**

@@ -51,6 +51,24 @@ struct OptionPair
 	int *greater;
 };
 
+/**
+ * Declares one bool option as a gate for a list of other options. When the
+ * gate is OFF the dependents are visually disabled in the Advanced Options
+ * UI and clicking them is a no-op (their stored values are preserved so
+ * turning the gate back on restores the previous configuration).
+ *
+ * Dependents can be bool or int options - the gate stores them as void*
+ * because the UI only needs pointer equality against OptionInfo::asBool()
+ * / asInt() results to decide which rows to grey out.
+ */
+struct OptionGate
+{
+	/// Controller - when false, dependents are disabled.
+	bool *gate;
+	/// Raw pointers to bool / int option storage.
+	std::vector<void*> dependents;
+};
+
 /// Path preview modes (can be OR'd together).
 enum PathPreview {
 	PATH_NONE         = 0x00, // 0000 (must always be zero)
@@ -122,6 +140,8 @@ namespace Options
 	const std::vector<OptionInfo> &getOptionInfo();
 	/// Gets the list of co-dependent option pairings.
 	const std::vector<OptionPair> &getOptionPairings();
+	/// Gets the list of option gates.
+	const std::vector<OptionGate> &getOptionGates();
 	/// Sets the game's data, user and config folders.
 	void setFolders();
 	/// Update game options from config file and command line.
