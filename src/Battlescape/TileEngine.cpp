@@ -987,35 +987,37 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 		[&](Tile* tile)
 		{
 			int currLight = 0;
+			int winR = 255, winG = 255, winB = 255;
+			Position winOffset(0, 0, 0);
 
-			if (tile->getMapData(O_FLOOR))
+			auto tryMapData = [&](TilePart part)
 			{
-				currLight = std::max(currLight, tile->getMapData(O_FLOOR)->getLightSource());
-			}
-			if (tile->getMapData(O_OBJECT))
-			{
-				currLight = std::max(currLight, tile->getMapData(O_OBJECT)->getLightSource());
-			}
-			if (tile->getMapData(O_WESTWALL))
-			{
-				currLight = std::max(currLight, tile->getMapData(O_WESTWALL)->getLightSource());
-			}
-			if (tile->getMapData(O_NORTHWALL))
-			{
-				currLight = std::max(currLight, tile->getMapData(O_NORTHWALL)->getLightSource());
-			}
+				MapData *md = tile->getMapData(part);
+				if (md && md->getLightSource() > currLight)
+				{
+					currLight = md->getLightSource();
+					md->getLightColor(winR, winG, winB);
+					winOffset = md->getLightOffset();
+				}
+			};
+			tryMapData(O_FLOOR);
+			tryMapData(O_OBJECT);
+			tryMapData(O_WESTWALL);
+			tryMapData(O_NORTHWALL);
 
 			// fires
-			if (tile->getFire())
+			if (tile->getFire() && unitFireLightPower > currLight)
 			{
-				currLight = std::max(currLight, unitFireLightPower);
+				currLight = unitFireLightPower;
+				_save->getMod()->getFireLightColor(winR, winG, winB);
+				winOffset = Position(0, 0, 0);
 			}
 
 			if (currLight >= getMaxStaticLightDistance())
 			{
 				currLight = getMaxStaticLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, LL_FIRE);
+			addLight(gs, tile->getPosition(), currLight, LL_FIRE, winR, winG, winB, false, winOffset);
 		}
 	);
 }
@@ -1032,18 +1034,25 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 		[&](Tile* tile)
 		{
 			int currLight = 0;
+			int winR = 255, winG = 255, winB = 255;
 
 			for (const auto* bi : *tile->getInventory())
 			{
 				if (bi->getGlow())
 				{
-					currLight = std::max(currLight, bi->getGlowRange());
+					int glowRange = bi->getGlowRange();
+					if (glowRange > currLight)
+					{
+						currLight = glowRange;
+						bi->getRules()->getLightColor(winR, winG, winB);
+					}
 				}
 
 				auto* bu = bi->getUnit();
-				if (bu && bu->getFire())
+				if (bu && bu->getFire() && unitFireLightPowerStunned > currLight)
 				{
-					currLight = std::max(currLight, unitFireLightPowerStunned);
+					currLight = unitFireLightPowerStunned;
+					_save->getMod()->getFireLightColor(winR, winG, winB);
 				}
 			}
 
@@ -1051,7 +1060,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, LL_ITEMS);
+			addLight(gs, tile->getPosition(), currLight, LL_ITEMS, winR, winG, winB);
 		}
 	);
 }
@@ -1069,18 +1078,32 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		}
 
 		int currLight = 0;
+		int winR = 255, winG = 255, winB = 255;
+		bool winBypassLOS = false;
+
+		// Personal armour light - bypasses LOS so it always reaches the unit's own tile.
+		auto tryPersonalLight = [&](int personalPower)
+		{
+			if (personalPower > currLight)
+			{
+				currLight = personalPower;
+				_save->getMod()->getPersonalLightColor(winR, winG, winB);
+				winBypassLOS = true;
+			}
+		};
+
 		// add lighting of unit
 		if (unit->getFaction() == FACTION_PLAYER)
 		{
-			currLight = std::max(currLight, _personalLighting ? unit->getArmor()->getPersonalLightFriend() : 0);
+			tryPersonalLight(_personalLighting ? unit->getArmor()->getPersonalLightFriend() : 0);
 		}
 		else if (unit->getFaction() == FACTION_HOSTILE)
 		{
-			currLight = std::max(currLight, unit->getArmor()->getPersonalLightHostile());
+			tryPersonalLight(unit->getArmor()->getPersonalLightHostile());
 		}
 		else if (unit->getFaction() == FACTION_NEUTRAL)
 		{
-			currLight = std::max(currLight, unit->getArmor()->getPersonalLightNeutral());
+			tryPersonalLight(unit->getArmor()->getPersonalLightNeutral());
 		}
 
 		const BattleItem *handWeapons[] = { unit->getLeftHandWeapon(), unit->getRightHandWeapon() };
@@ -1090,19 +1113,29 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 
 			if (w->getGlow())
 			{
-				currLight = std::max(currLight, w->getGlowRange());
+				int glowRange = w->getGlowRange();
+				if (glowRange > currLight)
+				{
+					currLight = glowRange;
+					w->getRules()->getLightColor(winR, winG, winB);
+					winBypassLOS = true;
+				}
 			}
 
 			auto* u = w->getUnit();
-			if (u && u->getFire())
+			if (u && u->getFire() && unitFireLightPowerStunned > currLight)
 			{
-				currLight = std::max(currLight, unitFireLightPowerStunned);
+				currLight = unitFireLightPowerStunned;
+				_save->getMod()->getFireLightColor(winR, winG, winB);
+				winBypassLOS = false;
 			}
 		}
 		// add lighting of units on fire
-		if (unit->getFire())
+		if (unit->getFire() && unitFireLightPower > currLight)
 		{
-			currLight = std::max(currLight, unitFireLightPower);
+			currLight = unitFireLightPower;
+			_save->getMod()->getFireLightColor(winR, winG, winB);
+			winBypassLOS = false;
 		}
 
 		if (currLight >= getMaxDynamicLightDistance())
@@ -1115,7 +1148,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-				addLight(gs, pos + Position(x, y, 0), currLight, LL_UNITS);
+				addLight(gs, pos + Position(x, y, 0), currLight, LL_UNITS, winR, winG, winB, winBypassLOS);
 			}
 		}
 	}
@@ -1237,7 +1270,9 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
  * @param power Power.
  * @param layer Light is separated in 4 layers: Ambient, Tiles, Items, Units.
  */
-void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers layer)
+void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers layer,
+                          int lightR, int lightG, int lightB,
+                          bool bypassLOS, Position lightOffset)
 {
 	if (power <= 0)
 	{
@@ -1251,9 +1286,12 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 	const auto tileHeight = _save->getTile(center)->getTerrainLevel();
 	const auto divide = (fire ? 8 : 4);
 	const auto accuracy = TileEngine::voxelTileSize / divide;
-	const auto offsetCenter = (accuracy / 2 + Position(-1, -1, (ground ? 0 : accuracy.z/4) - tileHeight * accuracy.z / 24));
+	const bool hasExplicitOffset = (lightOffset.x != 0 || lightOffset.y != 0 || lightOffset.z != 0);
+	const auto offsetCenter = hasExplicitOffset
+	    ? (lightOffset / divide)
+	    : (accuracy / 2 + Position(-1, -1, (ground ? 0 : accuracy.z/4) - tileHeight * accuracy.z / 24));
 	const auto offsetTarget = (accuracy / 2 + Position(-1, -1, 0));
-	const auto clasicLighting = !(getEnhancedLighting() & ((fire ? 1 : 0) | (items ? 2 : 0) | (units ? 4 : 0)));
+	const auto clasicLighting = bypassLOS || !(getEnhancedLighting() & ((fire ? 1 : 0) | (items ? 2 : 0) | (units ? 4 : 0)));
 	const auto topTargetVoxel = static_cast<Sint16>(_save->getMapSizeZ() * accuracy.z - 1);
 	const auto topCenterVoxel = static_cast<Sint16>((getBlockUp(_blockVisibility[_save->getTileIndex(center)]) ? (center.z + 1) : _save->getMapSizeZ()) * accuracy.z - 1);
 	const auto maxFirePower = std::min(15, getMaxStaticLightDistance() - 1);
@@ -1277,6 +1315,13 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			if (clasicLighting)
 			{
 				tile->addLight(currLight, layer);
+				{
+					const int cR = lightR * currLight / 15;
+					const int cG = lightG * currLight / 15;
+					const int cB = lightB * currLight / 15;
+					for (int c = 0; c < 4; ++c)
+						tile->addLightRGB(cR, cG, cB, layer, c);
+				}
 				return;
 			}
 			if (_lightPropagationTempNeedUpdate[idx] == 0)
@@ -1375,6 +1420,13 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			if (currLight > targetLight)
 			{
 				tile->addLight(currLight, layer);
+				{
+					const int cR = lightR * currLight / 15;
+					const int cG = lightG * currLight / 15;
+					const int cB = lightB * currLight / 15;
+					for (int c = 0; c < 4; ++c)
+						tile->addLightRGB(cR, cG, cB, layer, c);
+				}
 			}
 		}
 	);
