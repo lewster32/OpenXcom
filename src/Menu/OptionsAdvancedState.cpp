@@ -308,6 +308,36 @@ OptionInfo *OptionsAdvancedState::getSetting(size_t sel)
 }
 
 /**
+ * Rewrites the displayed value cell for the int option identified by the given
+ * pointer. Scans all five settings sections and updates the matching row;
+ * no-op if not found.
+ */
+void OptionsAdvancedState::refreshOptionRow(int *ptr)
+{
+	OptionOwner idx = _owner == _btnOXC ? OPTION_OXC : _owner == _btnOXCE ? OPTION_OXCE : OPTION_OTHER;
+	struct { int base; const std::vector<OptionInfo> *settings; } sections[] = {
+		{ _offsetGeneralMin, &_settingsGeneral[idx] },
+		{ _offsetGeoMin,     &_settingsGeo[idx] },
+		{ _offsetBaseMin,    &_settingsBase[idx] },
+		{ _offsetBattleMin,  &_settingsBattle[idx] },
+		{ _offsetAIMin,      &_settingsAI[idx] },
+	};
+	for (int k = 0; k < 5; ++k)
+	{
+		if (sections[k].base < 0) continue;
+		const std::vector<OptionInfo> &s = *sections[k].settings;
+		for (size_t j = 0; j < s.size(); ++j)
+		{
+			if (s[j].type() != OPTION_INT || s[j].asInt() != ptr) continue;
+			std::ostringstream ss;
+			ss << *ptr;
+			_lstOptions->setCellText(sections[k].base + 1 + (int)j, 1, ss.str());
+			return;
+		}
+	}
+}
+
+/**
  * Changes the clicked setting.
  * @param action Pointer to an action.
  */
@@ -346,7 +376,8 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		int *i = setting->asInt();
 
 		int increment = (button == SDL_BUTTON_LEFT) ? 1 : -1; // left-click increases, right-click decreases
-		if (i == &Options::changeValueByMouseWheel || i == &Options::FPS || i == &Options::FPSInactive || i == &Options::oxceWoundedDefendBaseIf)
+		if (i == &Options::changeValueByMouseWheel || i == &Options::FPS || i == &Options::FPSInactive || i == &Options::oxceWoundedDefendBaseIf
+			|| i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin)
 		{
 			increment *= 10;
 		}
@@ -419,6 +450,11 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			min = 5;
 			max = 50;
 		}
+		else if (i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin)
+		{
+			min = 10;
+			max = 100;
+		}
 		else if (i == &Options::oxceAutoNightVisionThreshold) {
 			min = 0;
 			max = 15;
@@ -441,6 +477,21 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		else if (*i > max)
 		{
 			*i = min;
+		}
+
+		// Enforce any declared co-dependent pairings (e.g. if one option must
+		// be less than or equal to another, and this change has made it no
+		// longer so, adjust the partner option accordingly).
+		const std::vector<OptionPair> &pairings = Options::getOptionPairings();
+		for (size_t p = 0; p < pairings.size(); ++p)
+		{
+			const OptionPair &pair = pairings[p];
+			if (i != pair.lesser && i != pair.greater) continue;
+			if (*pair.lesser <= *pair.greater) continue;
+			int *partner = (i == pair.lesser) ? pair.greater : pair.lesser;
+			*partner = *i;
+			refreshOptionRow(partner);
+			break;
 		}
 
 		std::ostringstream ss;
