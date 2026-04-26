@@ -38,6 +38,7 @@
 #include "../Mod/Mod.h"
 #include "../Mod/Armor.h"
 #include "../Mod/RuleSkill.h"
+#include "../Mod/AlienDeployment.h"
 #include "Pathfinding.h"
 #include "../Engine/Options.h"
 #include "ProjectileFlyBState.h"
@@ -1293,7 +1294,14 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 			gsStatic,
 			[&](Tile* tile, int index)
 			{
-				if (_lightPropagationTempNeedUpdate[index]) tile->resetLightMulti(layer);
+				if (_lightPropagationTempNeedUpdate[index])
+				{
+					tile->resetLightMulti(layer);
+					// Reset RGB accumulators for the static layers covered by this recalc.
+					// LL_AMBIENT (0) is always overwritten by setAccumRGB in finaliseTintPass, so
+					// it does not need a reset here - only LL_FIRE needs clearing in the static pass.
+					if (layer <= LL_FIRE) tile->resetAccumulator(LL_FIRE);
+				}
 			}
 		);
 	}
@@ -1303,7 +1311,14 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 		gsDynamic,
 		[&](Tile* tile, int index)
 		{
-			if (_lightPropagationTempNeedUpdate[index]) tile->resetLightMulti(std::max(layer, LL_ITEMS));
+			if (_lightPropagationTempNeedUpdate[index])
+			{
+				tile->resetLightMulti(std::max(layer, LL_ITEMS));
+				// Reset RGB accumulators for the dynamic layers covered by this recalc.
+				const LightLayers dynLayer = std::max(layer, LL_ITEMS);
+				if (dynLayer <= LL_ITEMS) tile->resetAccumulator(LL_ITEMS);
+				if (dynLayer <= LL_UNITS) tile->resetAccumulator(LL_UNITS);
+			}
 		}
 	);
 
@@ -1311,6 +1326,62 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 	if (layer <= LL_FIRE) calculateTerrainBackground(gsStatic);
 	if (layer <= LL_ITEMS) calculateTerrainItems(gsDynamic);
 	if (layer <= LL_UNITS) calculateUnitLighting(gsDynamic);
+
+	finaliseTintPass();
+}
+
+/**
+ * Applies ambient tint * skyVisibility into the LL_AMBIENT accumulator layer for every tile,
+ * then quantises every tile's per-corner accumulator into _gridIdx.
+ *
+ * The ambient colour is resolved from the active mission's AlienDeployment (if it defines a
+ * per-shade override via hasAmbientLightByShade) or from the mod-wide default otherwise.
+ * LL_AMBIENT is written with setAccumRGB (overwrite, not add) so consecutive calls do not
+ * double-accumulate - it is the sole ambient contribution and must not stack.
+ *
+ * No-op unless battleRealisticLighting is enabled; the vanilla blitNShade path never reads
+ * the accumulator, so skipping the work is safe.
+ */
+void TileEngine::finaliseTintPass()
+{
+	if (!Options::oxceBattleRealisticLighting) return;
+
+	// Resolve ambient RGB for this global shade.
+	// Per-mission AlienDeployment override takes precedence over the mod-wide default.
+	int ambR, ambG, ambB;
+	AlienDeployment *dep = _save->getMod()->getDeployment(_save->getMissionType(), false);
+	if (dep && dep->hasAmbientLightByShade())
+	{
+		dep->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+	}
+	else
+	{
+		_save->getMod()->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+	}
+
+	// Write ambient * skyVisibility into LL_AMBIENT for all 4 corners of every tile,
+	// then quantise the full per-corner accumulator into _gridIdx.
+	for (int i = 0; i < _save->getMapSizeXYZ(); ++i)
+	{
+		Tile *tile = _save->getTile(i);
+		const int sv = tile->getSkyVisibility();
+		const int aR = (ambR * sv) / 15;
+		const int aG = (ambG * sv) / 15;
+		const int aB = (ambB * sv) / 15;
+		// Overwrite (not add) - LL_AMBIENT is the exclusive home of the ambient contribution.
+		for (int c = 0; c < 4; ++c)
+			tile->setAccumRGB(aR, aG, aB, LL_AMBIENT, c);
+		tile->quantiseAccumulator();
+	}
+}
+
+/**
+ * Convenience aggregate: triggers a full-map lighting recalc through all four layers
+ * (sun, terrain, items, units) plus the trailing finaliseTintPass in one call.
+ */
+void TileEngine::recalculateLighting()
+{
+	calculateLighting(LL_AMBIENT);
 }
 
 /**

@@ -195,6 +195,10 @@ public:
 	bool checkReactionFire(BattleUnit *unit, const BattleAction &originalAction);
 	/// Recalculate all lighting in some area.
 	void calculateLighting(LightLayers layer, Position position = invalid, int eventRadius = 0, bool terrianChanged = false);
+	/// Applies ambient tint to LL_AMBIENT and finalises every tile's per-corner accumulator into _gridIdx. Must be called after one or more calculate* methods. calculateLighting invokes this automatically; manual calls are only needed when the calculate* methods are called directly outside calculateLighting.
+	void finaliseTintPass();
+	/// Convenience aggregate: calls calculateLighting(LL_AMBIENT) which cascades through sun+terrain+items+units, then invokes finaliseTintPass via the calculateLighting hook.
+	void recalculateLighting();
 	/// Computes per-tile sky-visibility factor (0-15) for the whole map. Called at battle init and on terrain destruction.
 	void calculateSkyVisibility();
 	/// Handles tile hit.
