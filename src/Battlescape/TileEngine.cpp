@@ -1359,8 +1359,9 @@ void TileEngine::finaliseTintPass()
 		_save->getMod()->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
 	}
 
-	// Write ambient * skyVisibility into LL_AMBIENT for all 4 corners of every tile,
-	// then quantise the full per-corner accumulator into _gridIdx.
+	// Write ambient * skyVisibility into LL_AMBIENT for all 4 corners of every tile.
+	// Overwrite (not add) - LL_AMBIENT is the exclusive home of the ambient contribution.
+	// Bloom below spreads this across doorways into interiors, so write it before bloom.
 	for (int i = 0; i < _save->getMapSizeXYZ(); ++i)
 	{
 		Tile *tile = _save->getTile(i);
@@ -1368,10 +1369,239 @@ void TileEngine::finaliseTintPass()
 		const int aR = (ambR * sv) / 15;
 		const int aG = (ambG * sv) / 15;
 		const int aB = (ambB * sv) / 15;
-		// Overwrite (not add) - LL_AMBIENT is the exclusive home of the ambient contribution.
 		for (int c = 0; c < 4; ++c)
 			tile->setAccumRGB(aR, aG, aB, LL_AMBIENT, c);
-		tile->quantiseAccumulator();
+	}
+
+	// Bloom: wall-aware diffusion so ambient bleeds through doorways into interiors
+	// and shadow edges are softened. Must run BEFORE quantise so it sees full-precision
+	// accumulator values.
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
+	{
+		bloomLighting();
+	}
+
+	// Stitch: reconcile shared world-vertices across the 2x2 tile neighbourhood so
+	// per-corner bilinear interpolation does not produce hairline seams at tile edges.
+	// Must also run before quantise for the same reason.
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner)
+	{
+		stitchVertices();
+	}
+
+	// Quantise the full per-corner accumulator into _gridIdx for the renderer.
+	for (int i = 0; i < _save->getMapSizeXYZ(); ++i)
+	{
+		_save->getTile(i)->quantiseAccumulator();
+	}
+}
+
+/**
+ * Wall-aware diffusion pass for each light layer's RGB accumulator. Reads the
+ * current per-layer per-channel corner-0 value into a temporary buffer, then for
+ * each tile takes the max of (current, neighbour - decayRGB) across its 4
+ * horizontal neighbours, gated by horizontalBlockage so walls block the bleed.
+ * Runs several iterations to soften shadow edges and let skylight leak through
+ * doorways into adjacent interior tiles.
+ *
+ * In per-corner mode a uniform bloom delta is computed from the per-tile average
+ * and redistributed to all 4 corners so per-corner asymmetry written by addLight
+ * is preserved while keeping bloom cost equivalent to a single-corner pass.
+ *
+ * Only meaningful when oxceBattleColourLightMix > 0; finaliseTintPass gates the
+ * call, but this function also returns immediately if the condition is not met.
+ */
+void TileEngine::bloomLighting()
+{
+	if (!Options::oxceBattleRealisticLighting || Options::oxceBattleColourLightMix <= 0) return;
+
+	const int sx = _save->getMapSizeX();
+	const int sy = _save->getMapSizeY();
+	const int sz = _save->getMapSizeZ();
+	const int iterations = 6;
+	const int decayRGB = 51; // 0-255 scale - same ~20% drop per hop as the scalar decay/15 ratio
+
+	static const int dx[4] = { 1, -1, 0, 0 };
+	static const int dy[4] = { 0, 0, 1, -1 };
+
+	std::vector<int> tmp(sx * sy * sz);
+
+	const bool perCorner = Options::oxceBattleColourLightPerCorner;
+	std::vector<int> origCorners;
+	if (perCorner) origCorners.resize(sx * sy * sz * 4);
+
+	for (int layer = 0; layer < LL_MAX; ++layer)
+	{
+		for (int channel = 0; channel < 3; ++channel) // 0=R, 1=G, 2=B
+		{
+			// Pre-bloom: snapshot 4 corners; write their average into corner 0.
+			if (perCorner)
+			{
+				for (int i = 0; i < sx * sy * sz; ++i)
+				{
+					Tile *t = _save->getTile(i);
+					int sumV = 0;
+					for (int c = 0; c < 4; ++c)
+					{
+						int v = (channel == 0) ? t->getAccumR(layer, c)
+						      : (channel == 1) ? t->getAccumG(layer, c)
+						      :                  t->getAccumB(layer, c);
+						origCorners[i * 4 + c] = v;
+						sumV += v;
+					}
+					int avg = sumV / 4;
+					int r = t->getAccumR(layer, 0);
+					int g = t->getAccumG(layer, 0);
+					int b = t->getAccumB(layer, 0);
+					if (channel == 0) r = avg;
+					else if (channel == 1) g = avg;
+					else b = avg;
+					t->setAccumRGB(r, g, b, layer, 0);
+				}
+			}
+
+			// Bloom corner 0 only (single-corner diffusion regardless of mode).
+			for (int iter = 0; iter < iterations; ++iter)
+			{
+				for (int i = 0; i < sx * sy * sz; ++i)
+				{
+					Tile *src = _save->getTile(i);
+					int v = (channel == 0) ? src->getAccumR(layer, 0)
+					      : (channel == 1) ? src->getAccumG(layer, 0)
+					      :                  src->getAccumB(layer, 0);
+					tmp[i] = v;
+				}
+				for (int z = 0; z < sz; ++z)
+				{
+					for (int y = 0; y < sy; ++y)
+					{
+						for (int x = 0; x < sx; ++x)
+						{
+							Tile *t = _save->getTile(Position(x, y, z));
+							if (!t) continue;
+							int best = tmp[(z * sy + y) * sx + x];
+							for (int d = 0; d < 4; ++d)
+							{
+								int nx = x + dx[d];
+								int ny = y + dy[d];
+								if (nx < 0 || ny < 0 || nx >= sx || ny >= sy) continue;
+								Tile *n = _save->getTile(Position(nx, ny, z));
+								if (!n) continue;
+								if (horizontalBlockage(t, n, DT_NONE) > 0) continue;
+								int leaked = tmp[(z * sy + ny) * sx + nx] - decayRGB;
+								if (leaked > best) best = leaked;
+							}
+							if (best > 255) best = 255;
+							if (best < 0) best = 0;
+							int r = t->getAccumR(layer, 0);
+							int g = t->getAccumG(layer, 0);
+							int b = t->getAccumB(layer, 0);
+							if (channel == 0) r = best;
+							else if (channel == 1) g = best;
+							else b = best;
+							t->setAccumRGB(r, g, b, layer, 0);
+						}
+					}
+				}
+			}
+
+			// Post-bloom: redistribute (bloomed_avg - orig_avg) delta to all 4 corners.
+			if (perCorner)
+			{
+				for (int i = 0; i < sx * sy * sz; ++i)
+				{
+					Tile *t = _save->getTile(i);
+					int origSum = origCorners[i*4+0] + origCorners[i*4+1] + origCorners[i*4+2] + origCorners[i*4+3];
+					int origAvg = origSum / 4;
+					int bloomedAvg = (channel == 0) ? t->getAccumR(layer, 0)
+					               : (channel == 1) ? t->getAccumG(layer, 0)
+					               :                  t->getAccumB(layer, 0);
+					int delta = bloomedAvg - origAvg;
+					for (int c = 0; c < 4; ++c)
+					{
+						int v = origCorners[i*4 + c] + delta;
+						if (v > 255) v = 255;
+						if (v < 0) v = 0;
+						int r = t->getAccumR(layer, c);
+						int g = t->getAccumG(layer, c);
+						int b = t->getAccumB(layer, c);
+						if (channel == 0) r = v;
+						else if (channel == 1) g = v;
+						else b = v;
+						t->setAccumRGB(r, g, b, layer, c);
+					}
+				}
+			}
+		}
+	}
+}
+
+/**
+ * For every shared world-vertex, takes the per-channel per-layer MAX across all
+ * (up to 4) tile corners that share that vertex, then writes it back to all of
+ * them. This prevents the per-corner bilinear floor blit from seeing
+ * discontinuous values at tile boundaries and producing hairline seams.
+ *
+ * Vertex (vx, vy) is shared by:
+ *   tile (vx,   vy  ) corner 0 (NW)
+ *   tile (vx-1, vy  ) corner 1 (NE)
+ *   tile (vx,   vy-1) corner 2 (SW)
+ *   tile (vx-1, vy-1) corner 3 (SE)
+ * Map-edge tiles hold fewer references and are skipped by the bounds check.
+ *
+ * Only meaningful in per-corner mode; finaliseTintPass gates the call, but this
+ * function also returns immediately if the condition is not met.
+ */
+void TileEngine::stitchVertices()
+{
+	if (!Options::oxceBattleRealisticLighting || !Options::oxceBattleColourLightPerCorner) return;
+
+	const int sx = _save->getMapSizeX();
+	const int sy = _save->getMapSizeY();
+	const int sz = _save->getMapSizeZ();
+
+	for (int z = 0; z < sz; ++z)
+	{
+		for (int vy = 0; vy <= sy; ++vy)
+		{
+			for (int vx = 0; vx <= sx; ++vx)
+			{
+				// The 4 (tile, corner) pairs that share this world-vertex.
+				const int refs[4][3] = {
+					{ vx,     vy,     0 }, // NW corner of tile (vx,   vy  )
+					{ vx - 1, vy,     1 }, // NE corner of tile (vx-1, vy  )
+					{ vx,     vy - 1, 2 }, // SW corner of tile (vx,   vy-1)
+					{ vx - 1, vy - 1, 3 }, // SE corner of tile (vx-1, vy-1)
+				};
+				for (int layer = 0; layer < LL_MAX; ++layer)
+				{
+					int maxR = 0, maxG = 0, maxB = 0, count = 0;
+					for (int i = 0; i < 4; ++i)
+					{
+						int tx = refs[i][0], ty = refs[i][1], c = refs[i][2];
+						if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
+						Tile *t = _save->getTile(Position(tx, ty, z));
+						if (!t) continue;
+						int r = t->getAccumR(layer, c);
+						int g = t->getAccumG(layer, c);
+						int b = t->getAccumB(layer, c);
+						if (r > maxR) maxR = r;
+						if (g > maxG) maxG = g;
+						if (b > maxB) maxB = b;
+						++count;
+					}
+					if (count <= 1) continue;
+					for (int i = 0; i < 4; ++i)
+					{
+						int tx = refs[i][0], ty = refs[i][1], c = refs[i][2];
+						if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
+						Tile *t = _save->getTile(Position(tx, ty, z));
+						if (!t) continue;
+						t->setAccumRGB(maxR, maxG, maxB, layer, c);
+					}
+				}
+			}
+		}
 	}
 }
 

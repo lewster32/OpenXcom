@@ -197,6 +197,10 @@ public:
 	void calculateLighting(LightLayers layer, Position position = invalid, int eventRadius = 0, bool terrianChanged = false);
 	/// Applies ambient tint to LL_AMBIENT and finalises every tile's per-corner accumulator into _gridIdx. Must be called after one or more calculate* methods. calculateLighting invokes this automatically; manual calls are only needed when the calculate* methods are called directly outside calculateLighting.
 	void finaliseTintPass();
+	/// Runs a wall-aware diffusion pass over each light layer's per-corner accumulator so skylight bleeds through openings into interiors and shadow edges stay soft. Only active when oxceBattleRealisticLighting AND oxceBattleColourLightMix > 0.
+	void bloomLighting();
+	/// Reconciles each shared world-vertex across the (up to 4) tiles that hold it, so per-corner bilinear interpolation in the floor blit does not introduce tile-edge discontinuities. No-op when oxceBattleRealisticLighting OR oxceBattleColourLightPerCorner is off.
+	void stitchVertices();
 	/// Convenience aggregate: calls calculateLighting(LL_AMBIENT) which cascades through sun+terrain+items+units, then invokes finaliseTintPass via the calculateLighting hook.
 	void recalculateLighting();
 	/// Computes per-tile sky-visibility factor (0-15) for the whole map. Called at battle init and on terrain destruction.
