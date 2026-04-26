@@ -962,6 +962,22 @@ void Surface::blitRaw(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSur
 }
 
 /**
+ * Translucent static blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest].
+ * Mirrors blitRaw but uses the BlendShade functor for translucent smoke rendering.
+ * @param dest destination surface
+ * @param src source surface (SurfaceRaw)
+ * @param x x position
+ * @param y y position
+ * @param shade shade value
+ * @param blendLUT 256x256 blend lookup table from Palette::getBlendLUT
+ */
+void Surface::blitRawBlend(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, const Uint8 *blendLUT)
+{
+	ShaderMove<const Uint8> src(srcSurf, x, y);
+	ShaderDraw<helper::BlendShade>(ShaderSurface(destSurf), src, ShaderScalar(shade), ShaderScalar(blendLUT));
+}
+
+/**
  * Specific blit function to blit battlescape terrain data in different shades in a fast way.
  * Notice there is no surface locking here - you have to make sure you lock the surface yourself
  * at the start of blitting and unlock it when done.

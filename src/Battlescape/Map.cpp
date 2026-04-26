@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <sstream>
 #include "Map.h"
 #include "Camera.h"
 #include "UnitSprite.h"
@@ -51,6 +52,7 @@
 #include "../Savegame/SavedGame.h"
 #include "../Interface/NumberText.h"
 #include "../Interface/Text.h"
+#include "../Engine/Options.h"
 #include "../fmath.h"
 
 
@@ -756,6 +758,30 @@ void Map::drawTerrain(Surface *surface)
 	const int halfAnimFrame = (_animFrame / 2) % 4;
 	const int halfAnimFrameRest = (_animFrame % 2);
 
+	// Precompute the 5 density-tier LUTs for smoke. Palette is constant for this draw pass;
+	// each tier t in [0..4] gets an opacity lerp'd between the user's min and max, rounded to the
+	// nearest 10%. Skip entirely only when BOTH max and min are 100 (fully opaque, fast path).
+	const Uint8 *smokeTierLUTs[5] = { 0, 0, 0, 0, 0 };
+	if (Options::oxceBattleSmokeOpacity < 100 || Options::oxceBattleSmokeOpacityMin < 100)
+	{
+		std::string palName = "PAL_BATTLESCAPE";
+		if (_save->getDepth() > 0)
+		{
+			std::ostringstream ss;
+			ss << "PAL_BATTLESCAPE_" << _save->getDepth();
+			palName = ss.str();
+		}
+		Palette *pal = _game->getMod()->getPalette(palName);
+		const int opMax = Options::oxceBattleSmokeOpacity;
+		const int opMin = std::min(Options::oxceBattleSmokeOpacityMin, opMax);
+		for (int tier = 0; tier < 5; ++tier)
+		{
+			int raw = opMin + (opMax - opMin) * tier / 4;
+			int rounded = ((raw + 5) / 10) * 10;
+			smokeTierLUTs[tier] = pal->getBlendLUT(rounded);
+		}
+	}
+
 	NumberText *_numWaypid = 0;
 
 	// if we got bullet, get the highest x and y tiles to draw it on
@@ -1259,7 +1285,18 @@ void Map::drawTerrain(Surface *surface)
 							frameNumber += halfAnimFrame + tile->getAnimationOffset();
 						}
 						tmpSurface = _game->getMod()->getSurfaceSet("SMOKE.PCK")->getFrame(frameNumber);
-						Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y, shade, false, _nvColor);
+						if (smokeTierLUTs[0])
+						{
+							// density 1-15 -> tier 0-4 (3 densities per tier).
+							int tier = (tile->getSmoke() - 1) / 3;
+							if (tier < 0) tier = 0;
+							else if (tier > 4) tier = 4;
+							Surface::blitRawBlend(surface, tmpSurface, screenPosition.x, screenPosition.y, shade, smokeTierLUTs[tier]);
+						}
+						else
+						{
+							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y, shade, false, _nvColor);
+						}
 					}
 
 					//draw particle clouds on front of solder

@@ -315,6 +315,8 @@ public:
 	void unlock();
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	static void blitRaw(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, bool half = false, int newBaseColor = 0);
+	/// Translucent static blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest]. Used for translucent smoke on a SurfaceRaw src.
+	static void blitRawBlend(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, const Uint8 *blendLUT);
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade = 0, bool half = false, int newBaseColor = 0) const;
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
