@@ -2570,6 +2570,7 @@ void Mod::loadAll()
 
 	sortLists();
 	modResources();
+	autoDeriveLightColors();
 }
 
 /**
@@ -6764,6 +6765,100 @@ void Mod::ScriptRegister(ScriptParserBase *parser)
 	mod.add<&Mod::getInventoryGround>("getRuleInventoryGround");
 
 	mod.addScriptValue<&Mod::_scriptGlobal, &ModScriptGlobal::getScriptValues>();
+}
+
+/**
+ * Averages the non-transparent pixels of a paletted Surface and returns their
+ * mean RGB. Palette index 0 is the transparency sentinel and is skipped.
+ * Returns false when the frame is null, the palette is null, or the sprite
+ * contained no non-transparent pixels (e.g. empty / fully-transparent frame).
+ * Caller must have resolved the Surface pointer on the main thread before
+ * calling this - SurfaceSet::getFrame is not thread-safe.
+ */
+bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g, int &b) const
+{
+	if (!frame || !palette) return false;
+
+	long long sumR = 0, sumG = 0, sumB = 0, n = 0;
+	const SDL_Color *colors = palette->getColors(0);
+	SDL_Surface *sdl = frame->getSurface();
+	const Uint8 *pixels = (const Uint8*)sdl->pixels;
+	int w = frame->getWidth(), h = frame->getHeight();
+	int pitch = sdl->pitch;
+	for (int y = 0; y < h; ++y)
+	{
+		for (int x = 0; x < w; ++x)
+		{
+			Uint8 idx = pixels[y * pitch + x];
+			if (idx == 0) continue; // palette index 0 = transparent
+			sumR += colors[idx].r;
+			sumG += colors[idx].g;
+			sumB += colors[idx].b;
+			++n;
+		}
+	}
+	if (n == 0) return false;
+	r = (int)(sumR / n);
+	g = (int)(sumG / n);
+	b = (int)(sumB / n);
+	return true;
+}
+
+/**
+ * Auto-derives RGB light colours for items and map data parts by averaging the
+ * non-transparent pixels of their primary sprites against PAL_BATTLESCAPE.
+ * Writes only to the auto-derive track (setLightColor); never clobbers
+ * mod-supplied values on the mod-override track (hasModLightColor guard).
+ * Only flare items are processed - other battle types do not consume lightColor
+ * at runtime so deriving for them would be wasted work.
+ * MapData parts are processed when hasAnyLightSource() returns true.
+ * Always runs unconditionally - sensible RGB defaults are a baseline
+ * expectation of the realistic-lighting feature, not a separate opt-in.
+ * Serial execution; parallel can be added later if profiling justifies it.
+ */
+void Mod::autoDeriveLightColors()
+{
+	Palette *pal = getPalette("PAL_BATTLESCAPE");
+	SurfaceSet *floorob = getSurfaceSet("FLOOROB.PCK");
+
+	// Phase 1: ensure every MapDataSet has its MCD loaded and MCDPatch applied
+	// before we try to walk its objects and resolve sprite frames.
+	for (std::map<std::string, MapDataSet*>::iterator it = _mapDataSets.begin(); it != _mapDataSets.end(); ++it)
+	{
+		it->second->loadData(getMCDPatch(it->second->getName()));
+	}
+
+	// Items: only BT_FLARE items consume lightColor at runtime; skip the rest.
+	for (std::map<std::string, RuleItem*>::iterator it = _items.begin(); it != _items.end(); ++it)
+	{
+		RuleItem *item = it->second;
+		if (item->getBattleType() != BT_FLARE) continue;
+		Surface *frame = floorob ? floorob->getFrame(item->getFloorSprite()) : 0;
+		if (!frame) continue;
+		int r, g, b;
+		if (deriveRGBFromSurface(frame, pal, r, g, b))
+			item->setLightColor(r, g, b);
+	}
+
+	// MapData parts: any part that has a light source on either track.
+	for (std::map<std::string, MapDataSet*>::iterator it = _mapDataSets.begin(); it != _mapDataSets.end(); ++it)
+	{
+		MapDataSet *set = it->second;
+		SurfaceSet *surf = set->getSurfaceset();
+		if (!surf) continue;
+		size_t count = set->getSize();
+		for (size_t i = 0; i < count; ++i)
+		{
+			MapData *md = set->getObject(i);
+			if (!md) continue;
+			if (!md->hasAnyLightSource()) continue;
+			Surface *frame = surf->getFrame(md->getSprite(0));
+			if (!frame) continue;
+			int r, g, b;
+			if (deriveRGBFromSurface(frame, pal, r, g, b))
+				md->setLightColor(r, g, b);
+		}
+	}
 }
 
 
