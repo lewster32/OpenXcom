@@ -317,12 +317,32 @@ public:
 	static void blitRaw(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, bool half = false, int newBaseColor = 0);
 	/// Translucent static blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest]. Used for translucent smoke on a SurfaceRaw src.
 	static void blitRawBlend(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, const Uint8 *blendLUT);
+	/// Emissive blit: every non-transparent pixel renders at the artist's authored value with no shade modifier. shade>=16 still hard-blacks the sprite for fog-of-war.
+	static void blitRawFullBright(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade);
+	/// Additive-photon tint blit: samples tintLUT[shadedSrc * 4096 + gridIdx]. tintLUT from Palette::getTintLUT(mix); gridIdx from Tile::getGridIdx() / getAvgGridIdx().
+	static void blitRawTint(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT);
+	/// Same as the simpler overload above, clipped to range (used for unit blits where the unit sprite is masked to the per-tile draw region).
+	static void blitRawTint(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range);
+	/// Per-corner floor blit: bilinearly interpolates the 4 corner gridIdxs across the isometric diamond per pixel, optionally dithers, quantises, then samples tintLUT.
+	static void blitRawTintFloor(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade,
+	                             Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
+	                             const Uint8 *tintLUT);
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade = 0, bool half = false, int newBaseColor = 0) const;
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade, GraphSubset range) const;
 	/// Translucent blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest]. Used for translucent smoke. Transparent when src==0.
 	void blitNShadeBlend(SurfaceRaw<Uint8> surface, int x, int y, int shade, const Uint8 *blendLUT) const;
+	/// Emissive blit; see blitRawFullBright.
+	void blitNShadeFullBright(SurfaceRaw<Uint8> surface, int x, int y, int shade) const;
+	/// Additive-photon tint blit; see blitRawTint.
+	void blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT) const;
+	/// Same, GraphSubset-clipped variant; see blitRawTint.
+	void blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range) const;
+	/// Per-corner floor blit; see blitRawTintFloor.
+	void blitNShadeTintFloor(SurfaceRaw<Uint8> surface, int x, int y, int shade,
+	                         Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
+	                         const Uint8 *tintLUT) const;
 	/// Invalidate the surface: force it to be redrawn
 	void invalidate(bool valid = true);
 

@@ -19,6 +19,8 @@
 #include "Surface.h"
 #include "ShaderDraw.h"
 #include "ShaderMove.h"
+#include "Options.h"
+#include "TintDither.h"
 #include <vector>
 #include <algorithm>
 #include <SDL_gfxPrimitives.h>
@@ -978,6 +980,185 @@ void Surface::blitRawBlend(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> s
 }
 
 /**
+ * Emissive blit: every non-transparent pixel renders at the artist's authored value with no shade
+ * modifier. Equivalent to blitRaw with shade=0 for all visible pixels. shade >= 16 still
+ * hard-blacks the sprite for fog-of-war.
+ * @param dest destination surface
+ * @param src source surface (SurfaceRaw)
+ * @param x x position
+ * @param y y position
+ * @param shade shade value; only values >= 16 (fog-of-war) have effect
+ */
+void Surface::blitRawFullBright(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade)
+{
+	ShaderMove<const Uint8> src(srcSurf, x, y);
+	ShaderDraw<helper::FullBrightShade>(ShaderSurface(destSurf), src, ShaderScalar(shade));
+}
+
+/**
+ * Additive-photon tint blit. Looks up tintLUT[shadedSrc * 4096 + gridIdx] for each
+ * non-transparent source pixel. shade >= 16 applies fog-of-war darkening before the lookup.
+ * @param dest destination surface
+ * @param src source surface (SurfaceRaw)
+ * @param x x position
+ * @param y y position
+ * @param shade shade value
+ * @param gridIdx 12-bit packed grid index from Tile::getGridIdx(); 0 = pure black
+ * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
+ */
+void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT)
+{
+	const int unused = 0;
+	ShaderMove<const Uint8> src(srcSurf, x, y);
+	helper::TintShadeParams p = {tintLUT, gridIdx};
+	ShaderDraw<helper::TintShade>(ShaderSurface(destSurf), src, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+}
+
+/**
+ * Masked additive-photon tint blit. Same as blitRawTint but clips writes to range.
+ * Used for unit sprites split across tile boundaries during walking.
+ * @param dest destination surface
+ * @param src source surface (SurfaceRaw)
+ * @param x x position
+ * @param y y position
+ * @param shade shade value
+ * @param gridIdx 12-bit packed grid index from Tile::getGridIdx()
+ * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
+ * @param range area that limits the draw surface
+ */
+void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range)
+{
+	const int unused = 0;
+	ShaderMove<const Uint8> src(srcSurf, x, y);
+	ShaderMove<Uint8> dest(destSurf);
+	dest.setDomain(range);
+	helper::TintShadeParams p = {tintLUT, gridIdx};
+	ShaderDraw<helper::TintShade>(dest, src, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+}
+
+/**
+ * Per-corner floor blit with bilinear interpolation of the 4 corner tint gridIdxs.
+ * For each non-transparent pixel in the source surface, computes isometric (u,v) coordinates,
+ * bilinearly interpolates between the 4 corner gridIdxs, quantises (with optional dithering
+ * per Options::oxceBattleColourLightDither), then looks up tintLUT.
+ *
+ * Corner layout (NW=0, NE=1, SW=2, SE=3):
+ *   u increases east, v increases south in screen space.
+ *   ns = (u - v + 1) * 0.5   maps [south=0 .. north=1]
+ *   nt = (u + v)     * 0.5   maps [west=0  .. east=1]
+ *
+ * @param dest destination surface
+ * @param src source surface (SurfaceRaw)
+ * @param x blit X position (screen coords)
+ * @param y blit Y position (screen coords)
+ * @param shade shade offset (same semantics as blitRaw)
+ * @param gridNW/NE/SW/SE per-corner 12-bit packed gridIdxs from Tile::getGridIdx(corner)
+ * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
+ */
+void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade,
+                               Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
+                               const Uint8 *tintLUT)
+{
+	// Unpack each corner into 4-bit (0-15) per-channel values.
+	int nwR = (gridNW >> 8) & 0xF, nwG = (gridNW >> 4) & 0xF, nwB = gridNW & 0xF;
+	int neR = (gridNE >> 8) & 0xF, neG = (gridNE >> 4) & 0xF, neB = gridNE & 0xF;
+	int swR = (gridSW >> 8) & 0xF, swG = (gridSW >> 4) & 0xF, swB = gridSW & 0xF;
+	int seR = (gridSE >> 8) & 0xF, seG = (gridSE >> 4) & 0xF, seB = gridSE & 0xF;
+
+	const int srcW = srcSurf.getWidth();
+	const int srcH = srcSurf.getHeight();
+	const int destW = destSurf.getWidth();
+	const int destH = destSurf.getHeight();
+	// The 4 world corners (NW, NE, SW, SE) project to the 4 vertices of the iso
+	// diamond inscribed in the BOTTOM srcW/2 rows of the sprite. OpenXcom floor
+	// sprites are 32x40 with the diamond at py [24..39]; the top 24 rows are
+	// reserved for upward extrusion and are transparent on flat floors.
+	// So the diamond's top vertex is at sprite-Y = srcH - diamondH.
+	const int diamondH = srcW / 2;
+	if (diamondH <= 0) return;
+	const int diamondTop = srcH - diamondH;
+
+	// Fixed-point arithmetic (16-bit fraction) so the inner loop avoids floats.
+	const int FP = 65536;
+
+	// All per-pixel dithering / quantisation lives in TintDither.
+	TintDither dither(Options::oxceBattleColourLightDither, srcW);
+
+	const int srcPitch = srcSurf.getPitch();
+	const Uint8 *srcBuf = srcSurf.getBuffer();
+	const int destPitch = destSurf.getPitch();
+	Uint8 *destBuf = destSurf.getBuffer();
+
+	for (int py = 0; py < srcH; ++py)
+	{
+		// v: vertical position normalised over the diamond (top=0, bottom=FP).
+		// Pixels above the diamond top clamp to 0; below clamp to FP.
+		int v = ((py - diamondTop) * FP + FP / 2) / diamondH;
+		if (v < 0) v = 0; else if (v > FP) v = FP;
+		dither.beginRow(py);
+
+		const Uint8 *srcRow = srcBuf + py * srcPitch;
+		for (int px = 0; px < srcW; ++px)
+		{
+			Uint8 src = srcRow[px];
+			if (!src) continue;
+			int u = (px * FP + FP / 2) / srcW;
+
+			// Iso-diamond bilinear weights:
+			//   ns = (u - v) + 0.5   - north weight: 0 at S vertex, 1 at N vertex.
+			//   nt = (u + v) - 0.5   - east weight:  0 at W vertex, 1 at E vertex.
+			// At the 4 diamond vertices these reach the full [0, 1] range.
+			int ns = (u - v) + FP / 2;
+			int nt = (u + v) - FP / 2;
+			if (nt < 0) nt = 0; else if (nt > FP) nt = FP;
+			if (ns < 0) ns = 0; else if (ns > FP) ns = FP;
+
+			// Bilinear interpolation in scaled (FP-precision) units.
+			// rN16 / gN16 / bN16 are [0, 15*FP] after the east-interpolation step.
+			int rN16 = (neR * nt + nwR * (FP - nt));
+			int gN16 = (neG * nt + nwG * (FP - nt));
+			int bN16 = (neB * nt + nwB * (FP - nt));
+			int rS16 = (seR * nt + swR * (FP - nt));
+			int gS16 = (seG * nt + swG * (FP - nt));
+			int bS16 = (seB * nt + swB * (FP - nt));
+			// Combine N/S, divide by FP^2 keeping 4 extra bits for dithering.
+			// Final scale: 0..240 (= 0..15 * 16).
+			long long r16 = ((long long)rN16 * ns + (long long)rS16 * (FP - ns)) >> (16 + 16 - 4);
+			long long g16 = ((long long)gN16 * ns + (long long)gS16 * (FP - ns)) >> (16 + 16 - 4);
+			long long b16 = ((long long)bN16 * ns + (long long)bS16 * (FP - ns)) >> (16 + 16 - 4);
+
+			// 4-bit-fraction in [0..240] -> clamped 4-bit out [0..15].
+			int r, g, b;
+			dither.quantise(px, (int)r16, (int)g16, (int)b16, r, g, b);
+			int interpGridIdx = (r << 8) | (g << 4) | b;
+
+			const int sx = x + px;
+			const int sy = y + py;
+			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH) continue;
+
+			// Pure additive: skip the shade-darkens-source step; the LUT encodes
+			// src * light so dim light naturally gives a dim result. Only honour
+			// shade when it signals fog-of-war (shade >= 16).
+			Uint8 shaded;
+			if (shade >= 16)
+			{
+				const Uint8 newShade = (src & helper::ColorShade) + (Uint8)shade;
+				if (newShade & helper::ColorGroup)
+					shaded = helper::ColorShade;
+				else
+					shaded = (src & helper::ColorGroup) | newShade;
+			}
+			else
+			{
+				shaded = src;
+			}
+			destBuf[sy * destPitch + sx] = tintLUT[(int)shaded * 4096 + interpGridIdx];
+		}
+		dither.endRow();
+	}
+}
+
+/**
  * Specific blit function to blit battlescape terrain data in different shades in a fast way.
  * Notice there is no surface locking here - you have to make sure you lock the surface yourself
  * at the start of blitting and unlock it when done.
@@ -1024,6 +1205,28 @@ void Surface::blitNShadeBlend(SurfaceRaw<Uint8> surface, int x, int y, int shade
 {
 	ShaderMove<const Uint8> src(this, x, y);
 	ShaderDraw<helper::BlendShade>(ShaderSurface(surface), src, ShaderScalar(shade), ShaderScalar(blendLUT));
+}
+
+void Surface::blitNShadeFullBright(SurfaceRaw<Uint8> surface, int x, int y, int shade) const
+{
+	blitRawFullBright(surface, SurfaceRaw<const Uint8>(this), x, y, shade);
+}
+
+void Surface::blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT) const
+{
+	blitRawTint(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridIdx, tintLUT);
+}
+
+void Surface::blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range) const
+{
+	blitRawTint(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridIdx, tintLUT, range);
+}
+
+void Surface::blitNShadeTintFloor(SurfaceRaw<Uint8> surface, int x, int y, int shade,
+                                  Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
+                                  const Uint8 *tintLUT) const
+{
+	blitRawTintFloor(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridNW, gridNE, gridSW, gridSE, tintLUT);
 }
 
 /**

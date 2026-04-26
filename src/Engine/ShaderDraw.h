@@ -246,6 +246,66 @@ struct BlendShade
 };
 
 /**
+ * Helper functor for Surface::blitNShadeFullBright / blitRawFullBright.
+ * Writes the source pixel exactly as authored - no shade modifier, no remapping.
+ * Equivalent to blitNShade with shade=0. Used for emissive sprites so they render
+ * at the artist's intended brightness regardless of the per-tile shade.
+ * shade >= 16 still hard-blacks the sprite for fog-of-war.
+ */
+struct FullBrightShade
+{
+	static inline void func(Uint8& dest, const Uint8& src, const int& shade)
+	{
+		if (src)
+		{
+			if (shade >= 16) dest = ColorShade; // fog-of-war: pure black
+			else             dest = src;
+		}
+	}
+};
+
+/// Parameter bundle for TintShade - packs LUT pointer + gridIdx into one scalar
+/// so ShaderDraw's source limit (dest + src + shade + params) is respected.
+struct TintShadeParams
+{
+	const Uint8 *tintLUT;
+	int gridIdx;
+};
+
+/**
+ * Helper functor for Surface::blitNShadeTint / blitRawTint.
+ * Applies shade to src when shade >= 16 (fog-of-war), then looks up
+ * tintLUT[shaded * 4096 + gridIdx] (4096 is the row stride for the
+ * 4-bit-per-channel additive-photon LUT).
+ * There is no gridIdx==0 fast path - the LUT entry at cell 0 has been authored
+ * to render pure black (see Palette::getTintLUT), so every tile passes through
+ * the lookup uniformly.
+ */
+struct TintShade
+{
+	static inline void func(Uint8& dest, const Uint8& src, const int& shade, const TintShadeParams& p, const int&)
+	{
+		if (src)
+		{
+			Uint8 shaded;
+			if (shade >= 16)
+			{
+				const Uint8 newShade = (src & ColorShade) + (Uint8)shade;
+				if (newShade & ColorGroup)
+					shaded = ColorShade;
+				else
+					shaded = (src & ColorGroup) | newShade;
+			}
+			else
+			{
+				shaded = src;
+			}
+			dest = p.tintLUT[(int)shaded * 4096 + p.gridIdx];
+		}
+	}
+};
+
+/**
  * helper class used for blitting dying unit with overkill
  */
 struct BurnShade
