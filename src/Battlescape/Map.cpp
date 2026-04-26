@@ -1285,7 +1285,7 @@ void Map::drawTerrain(Surface *surface)
 							frameNumber += halfAnimFrame + tile->getAnimationOffset();
 						}
 						tmpSurface = _game->getMod()->getSurfaceSet("SMOKE.PCK")->getFrame(frameNumber);
-						if (smokeTierLUTs[0])
+						if (smokeTierLUTs[0] && !tile->getFire())
 						{
 							// density 1-15 -> tier 0-4 (3 densities per tier).
 							int tier = (tile->getSmoke() - 1) / 3;
