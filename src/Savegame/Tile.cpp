@@ -1443,6 +1443,9 @@ void Tile::ScriptRegister(ScriptParserBase* parser)
 	t.add<&Tile::getFire>("getFire");
 	t.add<&Tile::getSmoke>("getSmoke");
 	t.add<&Tile::getShade>("getShade");
+	t.add<&Tile::getSkyVisibility>("getSkyVisibility", "Per-tile open-sky factor [0,15]. 15 = open sky, 2 = roofed (default).");
+	t.add<&Tile::getGridIdx>("getGridIdx", "Quantised additive-photon grid index for the given corner (0=NW,1=NE,2=SW,3=SE). 12 bits (4 bits per channel).");
+	t.add<&Tile::getAvgGridIdx>("getAvgGridIdx", "Single averaged grid index across all 4 corners; used for non-floor blits.");
 
 	t.add<&isDiscoveredScript>("isDiscovered", "Check what part of tile is discovered, 0x1 - floor, 0x2 - westwall, 0x4 - eastwall");
 	t.add<&makeDiscoveredScript>("makeDiscovered", "Make part of tile discovered, 0x1 - floor (will make both walls visible too), 0x2 - westwall, 0x4 - eastwall");
