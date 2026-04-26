@@ -138,6 +138,8 @@ private:
 	std::string _upgradeRace;
 	std::vector<std::tuple<size_t, std::string, std::string> > _alienRaceEvolution;
 	bool _noWeaponPile;
+	bool _hasAmbientLightByShade;
+	int _ambientColorsByShade[16][3]; // Per-shade ambient RGB override; valid only when _hasAmbientLightByShade is true.
 public:
 	/// Creates a blank Alien Deployment ruleset.
 	AlienDeployment(const std::string &type);
@@ -205,6 +207,10 @@ public:
 	std::vector<std::string> getTerrains() const;
 	/// Gets the shade level for battlescape generation.
 	int getShade() const;
+	/// True if this deployment defines its own ambientLightByShade table that should override the mod-wide default.
+	bool hasAmbientLightByShade() const { return _hasAmbientLightByShade; }
+	/// Gets the deployment's per-shade ambient RGB. Only meaningful when hasAmbientLightByShade() is true; otherwise the caller should fall back to Mod::getAmbientColor.
+	void getAmbientColor(int shade, int &r, int &g, int &b) const;
 	/// Gets the min shade level for battlescape generation.
 	int getMinShade() const;
 	/// Gets the max shade level for battlescape generation.

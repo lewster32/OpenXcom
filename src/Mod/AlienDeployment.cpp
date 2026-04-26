@@ -41,8 +41,10 @@ AlienDeployment::AlienDeployment(const std::string &type) :
 	_objectiveType(-1), _objectivesRequired(0), _objectiveCompleteScore(0), _objectiveFailedScore(0), _despawnPenalty(0), _abortPenalty(0), _points(0),
 	_turnLimit(0), _cheatTurn(20), _chronoTrigger(FORCE_LOSE), _keepCraftAfterFailedMission(false), _allowObjectiveRecovery(false), _escapeType(ESCAPE_NONE), _vipSurvivalPercentage(0),
 	_baseDetectionRange(0), _baseDetectionChance(100), _huntMissionMaxFrequency(60), _huntMissionRaceFromAlienBase(true),
-	_resetAlienBaseAgeAfterUpgrade(false), _resetAlienBaseAge(false), _noWeaponPile(false)
+	_resetAlienBaseAgeAfterUpgrade(false), _resetAlienBaseAge(false), _noWeaponPile(false),
+	_hasAmbientLightByShade(false)
 {
+	memset(_ambientColorsByShade, 0, sizeof(_ambientColorsByShade));
 }
 
 /**
@@ -216,6 +218,16 @@ void AlienDeployment::load(const YAML::YamlNodeReader& node, Mod *mod)
 		);
 	}
 	reader.tryRead("noWeaponPile", _noWeaponPile);
+	if (const auto& ambientNode = reader["ambientLightByShade"])
+	{
+		// Per-mission ambient override. Same anchor-based syntax as the mod-wide
+		// ambientLightByShade. When present, finaliseTintPass picks this up
+		// instead of Mod's default -- useful for indoor settings (UBASE/XBASE)
+		// or distinct-atmosphere terrains (MARS) that should not share the
+		// global day/night curve.
+		if (Mod::parseAmbientLightByShade(ambientNode, _ambientColorsByShade) > 0)
+			_hasAmbientLightByShade = true;
+	}
 }
 
 /**
@@ -362,6 +374,20 @@ int AlienDeployment::getMinShade() const
 int AlienDeployment::getMaxShade() const
 {
 	return _maxShade;
+}
+
+/**
+ * Returns the deployment's ambient RGB for the given shade. Only meaningful
+ * when hasAmbientLightByShade() is true; otherwise the table is all zeros and
+ * the caller must fall back to Mod::getAmbientColor.
+ */
+void AlienDeployment::getAmbientColor(int shade, int &r, int &g, int &b) const
+{
+	if (shade < 0) shade = 0;
+	if (shade > 15) shade = 15;
+	r = _ambientColorsByShade[shade][0];
+	g = _ambientColorsByShade[shade][1];
+	b = _ambientColorsByShade[shade][2];
 }
 
 /**
