@@ -996,6 +996,21 @@ void Surface::blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade, Gra
 }
 
 /**
+ * Translucent blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest].
+ * Used for translucent smoke rendering. Transparent when src == 0.
+ * @param surface destination to blit to
+ * @param x
+ * @param y
+ * @param shade shade offset applied to source
+ * @param blendLUT 256x256 LUT from Palette::getBlendLUT
+ */
+void Surface::blitNShadeBlend(SurfaceRaw<Uint8> surface, int x, int y, int shade, const Uint8 *blendLUT) const
+{
+	ShaderMove<const Uint8> src(this, x, y);
+	ShaderDraw<helper::BlendShade>(ShaderSurface(surface), src, ShaderScalar(shade), ShaderScalar(blendLUT));
+}
+
+/**
  * Set the surface to be redrawn.
  * @param valid true means redraw.
  */

@@ -213,6 +213,38 @@ struct StandardShade
 	}
 
 };
+
+/**
+ * help class used for Surface::blitNShadeBlend
+ */
+struct BlendShade
+{
+	/**
+	 * Function used by ShaderDraw in Surface::blitNShadeBlend.
+	 * Applies shade to src then looks up the blended palette index from a 256x256 LUT
+	 * indexed by (shadedSrc, dest). Transparent when src == 0.
+	 * @param dest destination pixel
+	 * @param src source pixel
+	 * @param shade value of shade of this surface
+	 * @param blendLUT 256x256 LUT from Palette::getBlendLUT
+	 */
+	static inline void func(Uint8& dest, const Uint8& src, const int& shade, const Uint8* const& blendLUT)
+	{
+		if (src)
+		{
+			const Uint8 newShade = (src & ColorShade) + shade;
+			Uint8 shaded;
+			if (newShade & ColorGroup)
+				// so dark it would flip over to another color - make it black instead
+				shaded = ColorShade;
+			else
+				shaded = (src & ColorGroup) | newShade;
+			dest = blendLUT[(int)shaded * 256 + (int)dest];
+		}
+	}
+
+};
+
 /**
  * helper class used for blitting dying unit with overkill
  */

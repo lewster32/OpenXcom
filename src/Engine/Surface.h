@@ -319,6 +319,8 @@ public:
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade = 0, bool half = false, int newBaseColor = 0) const;
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade, GraphSubset range) const;
+	/// Translucent blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest]. Used for translucent smoke. Transparent when src==0.
+	void blitNShadeBlend(SurfaceRaw<Uint8> surface, int x, int y, int shade, const Uint8 *blendLUT) const;
 	/// Invalidate the surface: force it to be redrawn
 	void invalidate(bool valid = true);
 
