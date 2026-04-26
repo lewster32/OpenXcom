@@ -111,6 +111,12 @@ OPT bool oxceUniformShootingSpread;
 OPT int oxceCrashedOrLanded;
 OPT int oxceBattleSmokeOpacity;
 OPT int oxceBattleSmokeOpacityMin;
+OPT bool oxceBattleRealisticLighting;
+OPT int oxceBattleColourLightMix;
+OPT bool oxceBattleColourLightAllowOverride;
+OPT bool oxceBattleColourLightAmbient;
+OPT bool oxceBattleColourLightPerCorner;
+OPT int oxceBattleColourLightDither;
 
 // OXCE hidden, accessible only via options.cfg
 /**
