@@ -174,6 +174,7 @@ set ( engine_src
   Engine/Surface.cpp
   Engine/SurfaceSet.cpp
   Engine/Timer.cpp
+  Engine/TintDither.cpp
   Engine/TouchState.cpp
   Engine/Unicode.cpp
   Engine/Yaml.cpp
