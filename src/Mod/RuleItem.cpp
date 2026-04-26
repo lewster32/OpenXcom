@@ -2959,6 +2959,24 @@ std::string debugDisplayScript(const RuleItem* ri)
 	}
 }
 
+void getLightColorRScript(const RuleItem* r, int& out)
+{
+	int g, b;
+	r->getLightColor(out, g, b);
+}
+
+void getLightColorGScript(const RuleItem* r, int& out)
+{
+	int rc, b;
+	r->getLightColor(rc, out, b);
+}
+
+void getLightColorBScript(const RuleItem* r, int& out)
+{
+	int rc, g;
+	r->getLightColor(rc, g, out);
+}
+
 }
 
 
@@ -3040,6 +3058,10 @@ void RuleItem::ScriptRegister(ScriptParserBase* parser)
 	ri.add<&RuleItem::isBlockingBothHands>("isBlockingBothHands");
 	ri.add<&isSingleTargetScript>("isSingleTarget");
 	ri.add<&hasCategoryScript>("hasCategory");
+
+	ri.add<&getLightColorRScript>("getLightColor.getR", "Effective lightColor red channel (mod-supplied if oxceBattleColourLightAllowOverride is on, else auto-derived).");
+	ri.add<&getLightColorGScript>("getLightColor.getG", "Effective lightColor green channel.");
+	ri.add<&getLightColorBScript>("getLightColor.getB", "Effective lightColor blue channel.");
 
 	ri.addScriptValue<BindBase::OnlyGet, &RuleItem::_scriptValues>();
 	ri.addDebugDisplay<&debugDisplayScript>();
