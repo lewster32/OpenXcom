@@ -147,9 +147,8 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 		}
 		if (mcd["lightColor"])
 		{
-			std::string hex = mcd["lightColor"].readVal<std::string>();
 			int r, g, b;
-			Palette::parseHexColor(hex, r, g, b);
+			Palette::readColor(mcd["lightColor"], r, g, b);
 			std::vector<int> rgb;
 			rgb.push_back(r);
 			rgb.push_back(g);

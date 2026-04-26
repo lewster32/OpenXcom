@@ -660,14 +660,11 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 	reader.tryRead("vaporDensitySurface", _vaporDensitySurface);
 	reader.tryRead("vaporProbabilitySurface", _vaporProbabilitySurface);
 
+	if (reader["lightColor"])
 	{
-		std::string hex;
-		if (reader.tryRead("lightColor", hex))
-		{
-			int r, g, b;
-			Palette::parseHexColor(hex, r, g, b);
-			setModLightColor(r, g, b);
-		}
+		int r, g, b;
+		Palette::readColor(reader["lightColor"], r, g, b);
+		setModLightColor(r, g, b);
 	}
 
 	mod->loadSpriteOffset(_type, _customItemPreviewIndex, reader["customItemPreviewIndex"], "CustomItemPreviews");

@@ -24,6 +24,8 @@
 namespace OpenXcom
 {
 
+namespace YAML { class YamlNodeReader; }
+
 /**
  * Container for palettes (sets of 8bpp colors).
  * Works as an encapsulation for SDL's SDL_Color struct and
@@ -62,6 +64,9 @@ public:
 	const Uint8 *getBlendLUT(int opacity);
 	/// Parses a "#rrggbb" hex colour string. On malformed input logs a warning and returns (255,255,255).
 	static void parseHexColor(const std::string &hex, int &r, int &g, int &b);
+	/// Reads a light colour from a YAML node. Accepts either "#rrggbb" hex string or [r, g, b] int array form.
+	/// On missing or malformed input, logs a warning and returns white (255, 255, 255).
+	static void readColor(const YAML::YamlNodeReader &node, int &r, int &g, int &b);
 	/// Returns a 256 * 4096 tint LUT for the additive-photon model. The grid index
 	/// is the 4-bit-per-channel bit-packed quantised RGB accumulator (12 bits total).
 	/// Cached per mix value; built lazily.

@@ -18,10 +18,12 @@
  */
 #include "Palette.h"
 #include <sstream>
+#include <vector>
 #include "CrossPlatform.h"
 #include "Exception.h"
 #include "FileMap.h"
 #include "Logger.h"
+#include "Yaml.h"
 
 namespace
 {
@@ -358,6 +360,37 @@ void Palette::parseHexColor(const std::string &hex, int &r, int &g, int &b)
 	r = (values[0] << 4) | values[1];
 	g = (values[2] << 4) | values[3];
 	b = (values[4] << 4) | values[5];
+}
+
+/**
+ * Reads a light colour from a YAML node.
+ * Accepts either a "#rrggbb" hex string or a [r, g, b] int array.
+ * On a missing or malformed node, logs a warning and returns white (255, 255, 255).
+ */
+void Palette::readColor(const YAML::YamlNodeReader &node, int &r, int &g, int &b)
+{
+	r = g = b = 255;
+	if (!node) return;
+
+	if (node.isSeq())
+	{
+		std::vector<int> rgb = node.readVal<std::vector<int> >();
+		if (rgb.size() == 3)
+		{
+			r = rgb[0];
+			g = rgb[1];
+			b = rgb[2];
+		}
+		else
+		{
+			Log(LOG_WARNING) << "readColor: expected 3-element array [r, g, b], got " << rgb.size() << " elements; using white";
+		}
+	}
+	else
+	{
+		std::string hex = node.readVal<std::string>();
+		parseHexColor(hex, r, g, b);
+	}
 }
 
 void Palette::setColors(SDL_Color* pal, int ncolors)
