@@ -158,6 +158,11 @@ private:
 	/// Tries to perform a reaction snap shot to this location.
 	bool tryReaction(ReactionScore *reaction, BattleUnit *target, const BattleAction &originalAction);
 public:
+	/// Ambient light factor assigned to tiles with an unobstructed view of the sky.
+	static const int SKY_OPEN = 15;
+	/// Ambient light factor assigned to tiles beneath an opaque ceiling.
+	static const int SKY_ROOFED = 2;
+
 	/// Creates a new TileEngine class.
 	TileEngine(SavedBattleGame *save, Mod *mod);
 	/// Cleans up the TileEngine.
@@ -190,6 +195,8 @@ public:
 	bool checkReactionFire(BattleUnit *unit, const BattleAction &originalAction);
 	/// Recalculate all lighting in some area.
 	void calculateLighting(LightLayers layer, Position position = invalid, int eventRadius = 0, bool terrianChanged = false);
+	/// Computes per-tile sky-visibility factor (0-15) for the whole map. Called at battle init and on terrain destruction.
+	void calculateSkyVisibility();
 	/// Handles tile hit.
 	int hitTile(Tile *tile, int damage, const RuleDamageType* type);
 	/// Handles experience training.

@@ -932,6 +932,55 @@ TileEngine::~TileEngine()
 }
 
 /**
+ * Computes the per-tile sky-visibility factor for every tile on the map.
+ * Walks each (x, y) column top-down. Tiles above the first opaque floor or
+ * downward-blocking object receive SKY_OPEN (15). All tiles below that
+ * blocker receive SKY_ROOFED (2). Diagonal-wall tiles (BIGWALLNESW /
+ * BIGWALLNWSE) are forced to SKY_OPEN so that chamfered building corners
+ * always render lit rather than dim.
+ * Uses the same blockage primitives as calculateSunShading for consistency.
+ */
+void TileEngine::calculateSkyVisibility()
+{
+	const int mapW = _save->getMapSizeX();
+	const int mapH = _save->getMapSizeY();
+	const int mapZ = _save->getMapSizeZ();
+
+	for (int x = 0; x < mapW; ++x)
+	{
+		for (int y = 0; y < mapH; ++y)
+		{
+			Uint8 visibility = SKY_OPEN;
+			for (int z = mapZ - 1; z >= 0; --z)
+			{
+				Tile *tile = _save->getTile(Position(x, y, z));
+				if (!tile) continue;
+
+				// Diagonal-walled tiles always render lit; skip the
+				// roofing check so chamfered corners stay bright.
+				MapData *obj = tile->getMapData(O_OBJECT);
+				const bool isDiagonalWall = obj &&
+					(obj->getBigWall() == Pathfinding::BIGWALLNESW
+					|| obj->getBigWall() == Pathfinding::BIGWALLNWSE);
+				tile->setSkyVisibility(isDiagonalWall ? SKY_OPEN : visibility);
+
+				if (!isDiagonalWall)
+				{
+					// A floor or a downward-blocking object on this tile
+					// marks all tiles below as roofed. Same tests as
+					// calculateSunShading uses for the sun-blocking check.
+					if (blockage(tile, O_FLOOR, DT_NONE) > 0
+						|| blockage(tile, O_OBJECT, DT_NONE, Pathfinding::DIR_DOWN) > 0)
+					{
+						visibility = SKY_ROOFED;
+					}
+				}
+			}
+		}
+	}
+}
+
+/**
   * Calculates sun shading for the whole terrain.
   */
 void TileEngine::calculateSunShading(MapSubset gs)
@@ -1258,7 +1307,7 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 		}
 	);
 
-	if (layer <= LL_AMBIENT) calculateSunShading(gsStatic);
+	if (layer <= LL_AMBIENT) { calculateSkyVisibility(); calculateSunShading(gsStatic); }
 	if (layer <= LL_FIRE) calculateTerrainBackground(gsStatic);
 	if (layer <= LL_ITEMS) calculateTerrainItems(gsDynamic);
 	if (layer <= LL_UNITS) calculateUnitLighting(gsDynamic);
