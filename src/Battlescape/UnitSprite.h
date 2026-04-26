@@ -60,6 +60,8 @@ private:
 	int _red, _blue;
 	int _x, _y, _shade, _burn;
 	GraphSubset _mask;
+	const Uint8 *_tintLUT;
+	int _tintGridIdx;
 
 	/// Drawing routine for XCom soldiers in overalls, sectoids (routine 0),
 	/// mutons (routine 10),
@@ -114,6 +116,8 @@ public:
 	~UnitSprite();
 	/// Draws the unit.
 	void draw(const BattleUnit* unit, int part, int x, int y, int shade, GraphSubset mask, bool drawFacingIndicator);
+	/// Sets additive-photon tint LUT for this draw call. Pass nullptr to disable tinting.
+	void setTintLUT(const Uint8 *tintLUT, int gridIdx) { _tintLUT = tintLUT; _tintGridIdx = gridIdx; }
 };
 
 } //namespace OpenXcom

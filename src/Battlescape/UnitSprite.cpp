@@ -50,7 +50,8 @@ UnitSprite::UnitSprite(Surface* dest, const Mod* mod, const SavedBattleGame* sav
 	_helmet(helmet),
 	_red(red), _blue(blue),
 	_x(0), _y(0), _shade(0), _burn(0),
-	_mask(0, 0)
+	_mask(0, 0),
+	_tintLUT(nullptr), _tintGridIdx(0)
 {
 
 }
@@ -149,7 +150,10 @@ void UnitSprite::blitItem(Part& item)
 
 	_dest->lock();
 
-	work.executeBlit(item.src, _dest,  _x + item.offX, _y + item.offY, _shade, _mask);
+	if (_tintLUT)
+		work.executeBlitTint(item.src, _dest, _x + item.offX, _y + item.offY, _shade, _mask, _tintLUT, _tintGridIdx);
+	else
+		work.executeBlit(item.src, _dest,  _x + item.offX, _y + item.offY, _shade, _mask);
 
 	_dest->unlock();
 }
@@ -169,7 +173,10 @@ void UnitSprite::blitBody(Part& body)
 
 	_dest->lock();
 
-	work.executeBlit(body.src, _dest,  _x + body.offX, _y + body.offY, _shade, _mask);
+	if (_tintLUT)
+		work.executeBlitTint(body.src, _dest, _x + body.offX, _y + body.offY, _shade, _mask, _tintLUT, _tintGridIdx);
+	else
+		work.executeBlit(body.src, _dest,  _x + body.offX, _y + body.offY, _shade, _mask);
 
 	_dest->unlock();
 }

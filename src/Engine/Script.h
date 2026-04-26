@@ -860,6 +860,8 @@ public:
 	void executeBlit(const Surface* src, Surface* dest, int x, int y, int shade);
 	/// Programmable blitting using script.
 	void executeBlit(const Surface* src, Surface* dest, int x, int y, int shade, GraphSubset mask);
+	/// Programmable blitting with additive-photon tint applied after shade/script.
+	void executeBlitTint(const Surface* src, Surface* dest, int x, int y, int shade, GraphSubset mask, const Uint8 *tintLUT, int gridIdx);
 
 	/// Clear all worker data.
 	void clear()

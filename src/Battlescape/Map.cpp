@@ -488,7 +488,7 @@ int getShadePulseForFrame(int shade, int frame)
  * @param obstacleShade
  * @param topLayer
  */
-void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Position currTileScreenPosition, bool topLayer, BattleUnit* movingUnit)
+void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Position currTileScreenPosition, bool topLayer, BattleUnit* movingUnit, const Uint8 *tintLUT, bool perCorner)
 {
 	const int tileFoorWidth = 32;
 	const int tileFoorHeight = 16;
@@ -728,7 +728,16 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 	{
 		shade = std::min(+NIGHT_VISION_SHADE, shade);
 	}
+	if (tintLUT)
+	{
+		// Route unit sprite through the additive-photon tint pipeline so it is
+		// coloured by the light at the tile it is drawn over (currTile). Units do
+		// not get per-corner bilinear - use the averaged gridIdx regardless of the
+		// perCorner flag since the unit sprite footprint covers the whole diamond.
+		unitSprite.setTintLUT(tintLUT, currTile->getAvgGridIdx());
+	}
 	unitSprite.draw(bu, part, tileScreenPosition.x + offsets.ScreenOffset.x, tileScreenPosition.y + offsets.ScreenOffset.y, shade, mask, _isAltPressed && !_isCtrlPressed);
+	unitSprite.setTintLUT(nullptr, 0);
 }
 
 /**
@@ -780,6 +789,26 @@ void Map::drawTerrain(Surface *surface)
 			int rounded = ((raw + 5) / 10) * 10;
 			smokeTierLUTs[tier] = pal->getBlendLUT(rounded);
 		}
+	}
+
+	// MASTER GATE: every coloured-lighting render path is keyed off
+	// oxceBattleRealisticLighting. When that option is off, tintLUT stays nullptr
+	// and perCorner is forced false, which makes every tinted/per-corner blit
+	// short-circuit to the vanilla blitRaw path - byte-identical to vanilla.
+	const Uint8 *tintLUT = nullptr;
+	const bool perCorner = Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner;
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
+	{
+		std::string tintPalName = "PAL_BATTLESCAPE";
+		if (_save->getDepth() > 0)
+		{
+			std::ostringstream tintSS;
+			tintSS << "PAL_BATTLESCAPE_" << _save->getDepth();
+			tintPalName = tintSS.str();
+		}
+		Palette *tintPal = _game->getMod()->getPalette(tintPalName);
+		if (tintPal)
+			tintLUT = tintPal->getTintLUT(Options::oxceBattleColourLightMix);
 	}
 
 	NumberText *_numWaypid = 0;
@@ -965,10 +994,30 @@ void Map::drawTerrain(Surface *surface)
 					tmpSurface = tile->getSprite(O_FLOOR);
 					if (tmpSurface)
 					{
-						if (tile->getObstacle(O_FLOOR))
-							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), obstacleShade, false, _nvColor);
+						// 3-way path:
+						//  - tintLUT off (realistic-lighting master gate off) -> vanilla blitRaw
+						//  - tintLUT on, floor is self-emissive (glowing panel/rune) -> FullBright
+						//    so the emitter sprite isn't tinted by its own light
+						//  - tintLUT on, non-emissive -> tinted blit (per-corner if enabled)
+						const int floorShade = tile->getObstacle(O_FLOOR) ? obstacleShade : tileShade;
+						const MapData *floorData = tile->getMapData(O_FLOOR);
+						if (!tintLUT)
+						{
+							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade, false, _nvColor);
+						}
+						else if (floorData && floorData->getLightSource() > 0)
+						{
+							Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade);
+						}
+						else if (perCorner)
+						{
+							Surface::blitRawTintFloor(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade,
+								tile->getGridIdx(0), tile->getGridIdx(1), tile->getGridIdx(2), tile->getGridIdx(3), tintLUT);
+						}
 						else
-							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), tileShade, false, _nvColor);
+						{
+							Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade, tile->getAvgGridIdx(), tintLUT);
+						}
 					}
 
 					auto* unit = tile->getUnit();
@@ -1015,7 +1064,7 @@ void Map::drawTerrain(Surface *surface)
 
 						for (size_t b = 0; b < std::size(backPos); ++b)
 						{
-							drawUnit(unitSprite, _save->getTile(mapPosition + backPos[b]), tile, screenPosition, topLayer);
+							drawUnit(unitSprite, _save->getTile(mapPosition + backPos[b]), tile, screenPosition, topLayer, nullptr, tintLUT, perCorner);
 						}
 					}
 
@@ -1026,20 +1075,32 @@ void Map::drawTerrain(Surface *surface)
 						if (tmpSurface)
 						{
 							int wallShade = getWallShade(O_WESTWALL, tile);
-							if (tile->getObstacle(O_WESTWALL))
-								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), obstacleShade, false, _nvColor);
+							const int wWShade = tile->getObstacle(O_WESTWALL) ? obstacleShade : wallShade;
+							if (tintLUT)
+							{
+								const int wallWGridIdx = tile->getAvgGridIdx();
+								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, wallWGridIdx, tintLUT);
+							}
 							else
-								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wallShade, false, _nvColor);
+							{
+								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, false, _nvColor);
+							}
 						}
 						// Draw north wall
 						tmpSurface = tile->getSprite(O_NORTHWALL);
 						if (tmpSurface)
 						{
 							int wallShade = getWallShade(O_NORTHWALL, tile);
-							if (tile->getObstacle(O_NORTHWALL))
-								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), obstacleShade, bool(tile->getSprite(O_WESTWALL)), _nvColor);
+							const int wNShade = tile->getObstacle(O_NORTHWALL) ? obstacleShade : wallShade;
+							if (tintLUT)
+							{
+								const int wallNGridIdx = tile->getAvgGridIdx();
+								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT);
+							}
 							else
-								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wallShade, bool(tile->getSprite(O_WESTWALL)), _nvColor);
+							{
+								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, bool(tile->getSprite(O_WESTWALL)), _nvColor);
+							}
 						}
 						// Draw object
 						tmpSurface = tile->getSprite(O_OBJECT);
@@ -1047,20 +1108,37 @@ void Map::drawTerrain(Surface *surface)
 						{
 							if (tile->isBackTileObject(O_OBJECT))
 							{
-								if (tile->getObstacle(O_OBJECT))
-									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), obstacleShade, false, _nvColor);
+								// 3-way: vanilla / emissive-FullBright / tinted (same as floor).
+								const MapData *objDataBack = tile->getMapData(O_OBJECT);
+								const bool objBackEmissive = objDataBack && objDataBack->getLightSource() > 0;
+								const int objBackShade = tile->getObstacle(O_OBJECT) ? obstacleShade : tileShade;
+								if (!tintLUT)
+								{
+									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade, false, _nvColor);
+								}
+								else if (objBackEmissive)
+								{
+									Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade);
+								}
 								else
-									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), tileShade, false, _nvColor);
+								{
+									const int objBackGridIdx = tile->getAvgGridIdx();
+									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade, objBackGridIdx, tintLUT);
+								}
 							}
 						}
 						// draw an item on top of the floor (if any)
 						BattleItem* item = tile->getTopItem();
 						if (item)
 						{
+							// For flare items when tintLUT is active, render full-bright
+							// (shade=0) so the flare sprite itself is not darkened by the
+							// surrounding darkness - the floor it sits on still tints normally.
+							const bool itemIsFlare = tintLUT && item->getRules()->getBattleType() == BT_FLARE;
 							itemSprite.draw(item,
 								screenPosition.x,
 								screenPosition.y + tile->getTerrainLevel(),
-								tileShade
+								itemIsFlare ? 0 : tileShade
 							);
 							if (_anyIndicator)
 							{
@@ -1226,7 +1304,7 @@ void Map::drawTerrain(Surface *surface)
 
 					unit = tile->getUnit();
 					// Draw soldier from this tile, below or above
-					drawUnit(unitSprite, tile, tile, screenPosition, topLayer, isUnitMovingNearby ? movingUnit : nullptr);
+					drawUnit(unitSprite, tile, tile, screenPosition, topLayer, isUnitMovingNearby ? movingUnit : nullptr, tintLUT, perCorner);
 
 					if (isUnitMovingNearby)
 					{
@@ -1242,7 +1320,7 @@ void Map::drawTerrain(Surface *surface)
 
 						for (size_t f = 0; f < std::size(frontPos); ++f)
 						{
-							drawUnit(unitSprite, _save->getTile(mapPosition + frontPos[f]), tile, screenPosition, topLayer);
+							drawUnit(unitSprite, _save->getTile(mapPosition + frontPos[f]), tile, screenPosition, topLayer, nullptr, tintLUT, perCorner);
 						}
 					}
 
@@ -1285,7 +1363,14 @@ void Map::drawTerrain(Surface *surface)
 							frameNumber += halfAnimFrame + tile->getAnimationOffset();
 						}
 						tmpSurface = _game->getMod()->getSurfaceSet("SMOKE.PCK")->getFrame(frameNumber);
-						if (smokeTierLUTs[0] && !tile->getFire())
+						if (tile->getFire() && tintLUT)
+						{
+							// Fire is opaque + emissive - skip the smoke blend LUT and render
+							// the flame at shade=0 (full-bright) so the flame pixels stay vivid
+							// and do not feed back into the blend against the already-tinted tile.
+							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y, 0);
+						}
+						else if (smokeTierLUTs[0] && !tile->getFire())
 						{
 							// density 1-15 -> tier 0-4 (3 densities per tier).
 							int tier = (tile->getSmoke() - 1) / 3;
@@ -1340,16 +1425,29 @@ void Map::drawTerrain(Surface *surface)
 					}
 
 					{
-						// Draw object
+						// Draw object (front - not a back-tile object)
 						tmpSurface = tile->getSprite(O_OBJECT);
 						if (tmpSurface)
 						{
 							if (!tile->isBackTileObject(O_OBJECT))
 							{
-								if (tile->getObstacle(O_OBJECT))
-									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), obstacleShade, false, _nvColor);
+								// 3-way: vanilla / emissive-FullBright / tinted (same as floor block).
+								const MapData *objDataFront = tile->getMapData(O_OBJECT);
+								const bool objFrontEmissive = objDataFront && objDataFront->getLightSource() > 0;
+								const int objFrontShade = tile->getObstacle(O_OBJECT) ? obstacleShade : tileShade;
+								if (!tintLUT)
+								{
+									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade, false, _nvColor);
+								}
+								else if (objFrontEmissive)
+								{
+									Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade);
+								}
 								else
-									Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), tileShade, false, _nvColor);
+								{
+									const int objFrontGridIdx = tile->getAvgGridIdx();
+									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade, objFrontGridIdx, tintLUT);
+								}
 							}
 						}
 					}

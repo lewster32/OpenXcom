@@ -605,6 +605,95 @@ void ScriptWorkerBlit::executeBlit(const Surface* src, Surface* dest, int x, int
 }
 
 /**
+ * Programmable blitting with additive-photon tint applied after shade/script.
+ * When a script (_proc) is active, it runs first (producing a shaded, script-
+ * recolored palette index), then the tintLUT is applied as a final step so unit
+ * sprites get the same per-tile colour wash as the surrounding terrain.
+ * When no script is active, this is equivalent to Surface::blitRawTint.
+ */
+void ScriptWorkerBlit::executeBlitTint(const Surface* src, Surface* dest, int x, int y, int shade, GraphSubset mask, const Uint8 *tintLUT, int gridIdx)
+{
+	ShaderMove<const Uint8> srcShader(src, x, y);
+	ShaderMove<Uint8> destShader(dest, 0, 0);
+	destShader.setDomain(mask);
+
+	if (_proc)
+	{
+		// Script-based path: run the script pipeline first, then apply tint.
+		if (_events)
+		{
+			ShaderDrawFunc(
+				[&](Uint8& destStuff, const Uint8& srcStuff)
+				{
+					if (srcStuff)
+					{
+						ScriptWorkerBlit::Output arg = { srcStuff, destStuff };
+						set(arg);
+						auto ptr = _events;
+						while (*ptr)
+						{
+							reset(arg);
+							scriptExe(*this, ptr->data());
+							++ptr;
+						}
+						++ptr;
+
+						reset(arg);
+						scriptExe(*this, _proc);
+
+						while (*ptr)
+						{
+							reset(arg);
+							scriptExe(*this, ptr->data());
+							++ptr;
+						}
+						++ptr;
+
+						get(arg);
+						Uint8 scripted = arg.getFirst();
+						if (scripted)
+						{
+							destStuff = tintLUT[(int)scripted * 4096 + gridIdx];
+						}
+					}
+				},
+				destShader,
+				srcShader
+			);
+		}
+		else
+		{
+			ShaderDrawFunc(
+				[&](Uint8& destStuff, const Uint8& srcStuff)
+				{
+					if (srcStuff)
+					{
+						ScriptWorkerBlit::Output arg = { srcStuff, destStuff };
+						set(arg);
+						scriptExe(*this, _proc);
+						get(arg);
+						Uint8 scripted = arg.getFirst();
+						if (scripted)
+						{
+							destStuff = tintLUT[(int)scripted * 4096 + gridIdx];
+						}
+					}
+				},
+				destShader,
+				srcShader
+			);
+		}
+	}
+	else
+	{
+		// No script: equivalent to blitRawTint.
+		const int unused = 0;
+		helper::TintShadeParams p = {tintLUT, gridIdx};
+		ShaderDraw<helper::TintShade>(destShader, srcShader, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+	}
+}
+
+/**
  * Execute script with two arguments.
  * @return Result value from script.
  */
