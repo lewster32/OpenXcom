@@ -120,6 +120,11 @@ protected:
 	TileCache _cache = { };
 	Position _pos;
 	Uint8 _light[LL_MAX];
+	Uint8 _skyVisibility = 15;                   // per-tile open-sky factor [0,15]; 15=open sky, 2=roofed (transient, not serialised)
+	Uint8 _accumR[LL_MAX][4] = {};               // per-layer per-corner R accumulator (transient, zeroed each recalc)
+	Uint8 _accumG[LL_MAX][4] = {};               // per-layer per-corner G accumulator
+	Uint8 _accumB[LL_MAX][4] = {};               // per-layer per-corner B accumulator
+	Uint16 _gridIdx[4] = {};                     // quantised result per corner: NW=0, NE=1, SW=2, SE=3 (12-bit packed RRRRGGGGBBBB)
 	Uint8 _fire = 0;
 	Uint8 _smoke = 0;
 	Uint8 _markerColor = 0;
@@ -306,6 +311,32 @@ public:
 	int getLightMulti(LightLayers layer) const;
 	/// Get the shade amount.
 	int getShade() const;
+	/// Gets the light value on a specific layer (used by the bloom diffusion pass).
+	int getLightLayer(int layer) const { return _light[layer]; }
+	/// Sets the light value on a specific layer directly (used by the bloom diffusion pass).
+	void setLightLayer(int layer, int value) { _light[layer] = (Uint8)(value > 15 ? 15 : (value < 0 ? 0 : value)); }
+	/// Gets the per-tile open-sky visibility factor [0,15]. Computed once at battle init.
+	Uint8 getSkyVisibility() const { return _skyVisibility; }
+	/// Sets the per-tile open-sky visibility factor [0,15].
+	void setSkyVisibility(Uint8 v) { _skyVisibility = v > 15 ? 15 : v; }
+	/// Resets a single layer's RGB accumulator to zero for all 4 corners. Called at the start of each lighting recalc for that layer.
+	void resetAccumulator(int layer);
+	/// Saturating-add a contribution to the given layer's per-corner RGB accumulator.
+	void addLightRGB(int r, int g, int b, int layer, int corner);
+	/// Reads the raw layer+corner R accumulator (used by bloom diffusion).
+	int getAccumR(int layer, int corner = 0) const { return _accumR[layer][corner]; }
+	/// Reads the raw layer+corner G accumulator (used by bloom diffusion).
+	int getAccumG(int layer, int corner = 0) const { return _accumG[layer][corner]; }
+	/// Reads the raw layer+corner B accumulator (used by bloom diffusion).
+	int getAccumB(int layer, int corner = 0) const { return _accumB[layer][corner]; }
+	/// Overwrites the raw layer+corner accumulator (used by bloom diffusion's output write-back). Saturating clamp.
+	void setAccumRGB(int r, int g, int b, int layer, int corner = 0);
+	/// Saturating-sums all LL_MAX layers per channel for each of the 4 corners, then bit-shift quantises to _gridIdx[4] using 4 bits per channel (12-bit packed RRRRGGGGBBBB).
+	void quantiseAccumulator();
+	/// Gets the quantised grid index for a given corner (0=NW,1=NE,2=SW,3=SE). One-shot lookup key into the tintLUT.
+	Uint16 getGridIdx(int corner = 0) const { return _gridIdx[corner]; }
+	/// Returns a single averaged gridIdx for walls/objects (average of the 4-corner RGBs, repacked to 12-bit).
+	Uint16 getAvgGridIdx() const;
 	/// Destroy a tile part.
 	bool destroy(TilePart part, SpecialTileType type);
 	/// Damage a tile part.
@@ -373,6 +404,8 @@ public:
 	void removeItem(BattleItem *item);
 	/// Get top-most item
 	BattleItem* getTopItem();
+	/// Returns the topmost (heaviest) inventory item, or null if the inventory is empty. Matches the item that getTopItem would return. Used by lighting to find an emissive ground item (e.g. dropped flare).
+	const BattleItem* getTopItem() const;
 	/// New turn preparations.
 	void prepareNewTurn(bool smokeDamage);
 	/// Get inventory on this tile.

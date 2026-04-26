@@ -1095,6 +1095,130 @@ void Tile::resetObstacle(void)
 }
 
 
+/**
+ * Resets a single layer's RGB accumulator to zero for all 4 corners.
+ * Called at the start of each lighting recalc for that layer.
+ * @param layer Layer index.
+ */
+void Tile::resetAccumulator(int layer)
+{
+	for (int c = 0; c < 4; ++c)
+	{
+		_accumR[layer][c] = 0;
+		_accumG[layer][c] = 0;
+		_accumB[layer][c] = 0;
+	}
+}
+
+/**
+ * Saturating-add a coloured contribution into the given layer's per-corner RGB accumulator.
+ * Channels clamp independently at 255.
+ * @param r Red contribution.
+ * @param g Green contribution.
+ * @param b Blue contribution.
+ * @param layer Layer index.
+ * @param corner Corner index (0=NW, 1=NE, 2=SW, 3=SE).
+ */
+void Tile::addLightRGB(int r, int g, int b, int layer, int corner)
+{
+	int sr = (int)_accumR[layer][corner] + r;
+	int sg = (int)_accumG[layer][corner] + g;
+	int sb = (int)_accumB[layer][corner] + b;
+	_accumR[layer][corner] = (Uint8)(sr > 255 ? 255 : (sr < 0 ? 0 : sr));
+	_accumG[layer][corner] = (Uint8)(sg > 255 ? 255 : (sg < 0 ? 0 : sg));
+	_accumB[layer][corner] = (Uint8)(sb > 255 ? 255 : (sb < 0 ? 0 : sb));
+}
+
+/**
+ * Overwrites the raw layer+corner accumulator with a saturating clamp.
+ * Used by the bloom diffusion pass write-back.
+ * @param r Red value.
+ * @param g Green value.
+ * @param b Blue value.
+ * @param layer Layer index.
+ * @param corner Corner index.
+ */
+void Tile::setAccumRGB(int r, int g, int b, int layer, int corner)
+{
+	_accumR[layer][corner] = (Uint8)(r > 255 ? 255 : (r < 0 ? 0 : r));
+	_accumG[layer][corner] = (Uint8)(g > 255 ? 255 : (g < 0 ? 0 : g));
+	_accumB[layer][corner] = (Uint8)(b > 255 ? 255 : (b < 0 ? 0 : b));
+}
+
+/**
+ * Saturating-sums all LL_MAX layers per channel for each of the 4 corners,
+ * then bit-shift quantises to _gridIdx[4] (4 bits per channel, 12-bit packed RRRRGGGGBBBB).
+ * Ambient * skyVisibility is assumed to have already been written into accumulator
+ * layer 0 by TileEngine::finaliseTintPass before this is called.
+ */
+void Tile::quantiseAccumulator()
+{
+	for (int c = 0; c < 4; ++c)
+	{
+		int sumR = 0, sumG = 0, sumB = 0;
+		for (int l = 0; l < LL_MAX; ++l)
+		{
+			sumR += _accumR[l][c];
+			sumG += _accumG[l][c];
+			sumB += _accumB[l][c];
+		}
+		if (sumR > 255) sumR = 255;
+		if (sumG > 255) sumG = 255;
+		if (sumB > 255) sumB = 255;
+		Uint16 qR = (Uint16)(sumR >> 4);
+		Uint16 qG = (Uint16)(sumG >> 4);
+		Uint16 qB = (Uint16)(sumB >> 4);
+		_gridIdx[c] = (qR << 8) | (qG << 4) | qB;
+	}
+}
+
+/**
+ * Returns a single averaged gridIdx for walls/objects.
+ * Unpacks each corner's (R,G,B), averages across 4 corners, repacks to 12-bit RRRRGGGGBBBB.
+ * Used for non-floor blits where per-corner interpolation is not applied.
+ */
+Uint16 Tile::getAvgGridIdx() const
+{
+	int sR = 0, sG = 0, sB = 0;
+	for (int c = 0; c < 4; ++c)
+	{
+		sR += (_gridIdx[c] >> 8) & 0xF;
+		sG += (_gridIdx[c] >> 4) & 0xF;
+		sB += _gridIdx[c] & 0xF;
+	}
+	Uint16 qR = (Uint16)(sR / 4);
+	Uint16 qG = (Uint16)(sG / 4);
+	Uint16 qB = (Uint16)(sB / 4);
+	return (Uint16)((qR << 8) | (qG << 4) | qB);
+}
+
+/**
+ * Returns the topmost (heaviest) inventory item, or null when the inventory is empty.
+ * Const overload - delegates to the non-const version's logic.
+ * Matches the item that the non-const getTopItem would return.
+ * Used by the lighting code to inspect emissive ground items (e.g. a dropped flare).
+ */
+const BattleItem* Tile::getTopItem() const
+{
+	if (_inventory.empty()) return 0;
+	// For large piles use the same fast path as the non-const version.
+	if (_inventory.size() > 100) return _inventory.front();
+	int biggestWeight = -999;
+	const BattleItem* biggest = 0;
+	for (const auto* bi : _inventory)
+	{
+		if (bi->getUnit()) return bi;
+		int temp = bi->getTotalWeight();
+		if (temp > biggestWeight)
+		{
+			biggestWeight = temp;
+			biggest = bi;
+		}
+	}
+	return biggest;
+}
+
+
 ////////////////////////////////////////////////////////////
 //					Script binding
 ////////////////////////////////////////////////////////////
