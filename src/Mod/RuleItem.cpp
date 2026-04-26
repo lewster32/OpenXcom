@@ -30,6 +30,8 @@
 #include "../Savegame/BattleUnit.h"
 #include "../Engine/Exception.h"
 #include "../Engine/Collections.h"
+#include "../Engine/Options.h"
+#include "../Engine/Palette.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Engine/Surface.h"
 #include "../Engine/ScriptBind.h"
@@ -182,6 +184,8 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_LOSRequired(false), _underwaterOnly(false), _landOnly(false), _psiReqiured(false), _manaRequired(false),
 	_meleePower(0), _specialType(-1), _vaporColor(-1), _vaporDensity(0), _vaporProbability(15),
 	_vaporColorSurface(-1), _vaporDensitySurface(0), _vaporProbabilitySurface(15),
+	_lightColorR(255), _lightColorG(255), _lightColorB(255),
+	_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
 	_kneelBonus(-1), _oneHandedPenalty(-1),
 	_monthlySalary(0), _monthlyMaintenance(0),
 	_sprayWaypoints(0)
@@ -655,6 +659,16 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 	mod->loadTransparencyOffset(_type, _vaporColorSurface, reader["vaporColorSurface"]);
 	reader.tryRead("vaporDensitySurface", _vaporDensitySurface);
 	reader.tryRead("vaporProbabilitySurface", _vaporProbabilitySurface);
+
+	{
+		std::string hex;
+		if (reader.tryRead("lightColor", hex))
+		{
+			int r, g, b;
+			Palette::parseHexColor(hex, r, g, b);
+			setModLightColor(r, g, b);
+		}
+	}
 
 	mod->loadSpriteOffset(_type, _customItemPreviewIndex, reader["customItemPreviewIndex"], "CustomItemPreviews");
 	reader.tryRead("kneelBonus", _kneelBonus);
@@ -1315,6 +1329,58 @@ int RuleItem::getPsiMissAnimation() const
 int RuleItem::getPower() const
 {
 	return _power;
+}
+
+/**
+ * Gets the additive-photon RGB tint contributed by this item's light source.
+ * With Options::oxceBattleColourLightAllowOverride on and a mod-supplied colour
+ * recorded, returns the mod-supplied values; otherwise returns the auto-derived
+ * (or vanilla white) track.
+ * @param r Red channel (0-255).
+ * @param g Green channel (0-255).
+ * @param b Blue channel (0-255).
+ */
+void RuleItem::getLightColor(int &r, int &g, int &b) const
+{
+	if (Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
+	{
+		r = _modLightColorR;
+		g = _modLightColorG;
+		b = _modLightColorB;
+	}
+	else
+	{
+		r = _lightColorR;
+		g = _lightColorG;
+		b = _lightColorB;
+	}
+}
+
+/**
+ * Sets the auto-derived (or default) lightColor track.
+ * @param r Red channel (0-255).
+ * @param g Green channel (0-255).
+ * @param b Blue channel (0-255).
+ */
+void RuleItem::setLightColor(int r, int g, int b)
+{
+	_lightColorR = r;
+	_lightColorG = g;
+	_lightColorB = b;
+}
+
+/**
+ * Sets the mod-supplied lightColor override.
+ * @param r Red channel (0-255).
+ * @param g Green channel (0-255).
+ * @param b Blue channel (0-255).
+ */
+void RuleItem::setModLightColor(int r, int g, int b)
+{
+	_modLightColorR = r;
+	_modLightColorG = g;
+	_modLightColorB = b;
+	_hasModLightColor = true;
 }
 
 /**

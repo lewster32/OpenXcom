@@ -475,6 +475,9 @@ private:
 	bool _LOSRequired, _underwaterOnly, _landOnly, _psiReqiured, _manaRequired;
 	int _meleePower, _specialType, _vaporColor, _vaporDensity, _vaporProbability;
 	int _vaporColorSurface, _vaporDensitySurface, _vaporProbabilitySurface;
+	int _lightColorR, _lightColorG, _lightColorB;          // auto-derived (or vanilla default white) lightColor track
+	int _modLightColorR, _modLightColorG, _modLightColorB; // mod-supplied lightColor (from item YAML)
+	bool _hasModLightColor;
 	std::vector<int> _customItemPreviewIndex;
 	int _kneelBonus, _oneHandedPenalty;
 	int _monthlySalary, _monthlyMaintenance;
@@ -667,6 +670,14 @@ public:
 
 	/// Gets the item's power.
 	int getPower() const;
+	/// Gets the effective lightColor. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins; otherwise the auto-derived (or vanilla white) value is returned.
+	void getLightColor(int &r, int &g, int &b) const;
+	/// Sets the auto-derived (or default) lightColor.
+	void setLightColor(int r, int g, int b);
+	/// Sets the mod-supplied lightColor override (called from RuleItem YAML load).
+	void setModLightColor(int r, int g, int b);
+	/// True iff a mod-supplied lightColor override has been recorded for this item.
+	bool hasModLightColor() const { return _hasModLightColor; }
 	/// Gets the item's power used for AoE explosion animation.
 	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?
