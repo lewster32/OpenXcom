@@ -221,6 +221,9 @@ private:
 
 	int _maxViewDistance, _maxDarknessToSeeUnits;
 	int _maxStaticLightDistance, _maxDynamicLightDistance, _enhancedLighting;
+	int _ambientColorsByShade[16][3];  // per-shade RGB ambient table; row = shade [0,15], cols = R, G, B [0,255]
+	int _personalLightColor[3];        // soldier personal-light RGB; defaults to (128, 128, 128)
+	int _fireLightColor[3];            // emitted-light RGB used for both tile fire and burning units; defaults to (255, 128, 0)
 	int _costHireEngineer, _costHireScientist;
 	int _costEngineer, _costScientist, _timePersonnel, _hireByCountryOdds, _hireByRegionOdds, _initialFunding;
 	int _globalTransferCostMult, _globalTransferCostDiv;
@@ -783,6 +786,16 @@ public:
 	int getMaxDynamicLightDistance() const { return _maxDynamicLightDistance; }
 	/// Get flags for enhanced lighting, 0x1 - tiles and fire, 0x2 - items, 0x4 - units.
 	int getEnhancedLighting() const { return _enhancedLighting; }
+	/// Gets the ambient RGB triple for a given globalShade [0,15]. Out-params filled from the stored table; shade is clamped.
+	void getAmbientColor(int shade, int &r, int &g, int &b) const;
+	/// Gets the soldier personal-light RGB (default greyish #808080). Set in mod via personalLightColor.
+	void getPersonalLightColor(int &r, int &g, int &b) const;
+	/// Gets the fire emitted-light RGB (default orange #ff8000). Used for both tile fire and burning units. Set in mod via fireLightColor.
+	void getFireLightColor(int &r, int &g, int &b) const;
+	/// Parses an `ambientLightByShade` YAML list (sparse anchors) into a 16-row RGB table, linearly interpolating gaps.
+	/// Returns the number of anchors found; 0 means the node was missing/empty and outTable was not touched.
+	/// Shared by Mod (mod-wide default) and AlienDeployment (per-mission override).
+	static int parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable[16][3]);
 	/// Get basic damage type
 	const RuleDamageType *getDamageType(ItemDamageType type) const;
 

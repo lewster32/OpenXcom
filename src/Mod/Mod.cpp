@@ -595,6 +595,19 @@ Mod::Mod() :
 	_pilotBraveryThresholds[0] = 90;
 	_pilotBraveryThresholds[1] = 80;
 	_pilotBraveryThresholds[2] = 30;
+
+	// Greyscale fallback: rgb[s] = (255 - 17*s, ...). Overridden by ambientLightByShade YAML if present.
+	for (int s = 0; s < 16; ++s)
+	{
+		int v = 255 - s * 17; if (v < 0) v = 0;
+		_ambientColorsByShade[s][0] = v;
+		_ambientColorsByShade[s][1] = v;
+		_ambientColorsByShade[s][2] = v;
+	}
+	// Defaults for the previously-hardcoded TileEngine light colours.
+	// Mod overrides: personalLightColor / fireLightColor.
+	_personalLightColor[0] = 128; _personalLightColor[1] = 128; _personalLightColor[2] = 128;
+	_fireLightColor[0]     = 255; _fireLightColor[1]     = 128; _fireLightColor[2]     = 0;
 }
 
 /**
@@ -1063,6 +1076,91 @@ Sound *Mod::getSound(const std::string &set, int sound) const
 Palette *Mod::getPalette(const std::string &name, bool error) const
 {
 	return getRule(name, "Palette", _palettes, error);
+}
+
+/**
+ * Gets the ambient RGB triple for a given globalShade. Out-of-range shade is clamped.
+ * The table is initialised to a greyscale ramp (255 - 17*shade) and overridden by the
+ * mod's ambientLightByShade YAML if present.
+ */
+void Mod::getAmbientColor(int shade, int &r, int &g, int &b) const
+{
+	if (shade < 0) shade = 0;
+	if (shade > 15) shade = 15;
+	r = _ambientColorsByShade[shade][0];
+	g = _ambientColorsByShade[shade][1];
+	b = _ambientColorsByShade[shade][2];
+}
+
+/**
+ * Parses an `ambientLightByShade` YAML list (sparse anchors) into a 16x3 RGB
+ * table. For each anchor shade the colour is stored; for unlisted shades
+ * the value is linearly interpolated between the two nearest anchors (or
+ * clamped to the nearest if only one side has an anchor). Returns the number
+ * of valid anchors parsed; 0 means the caller's outTable was not modified.
+ */
+int Mod::parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable[16][3])
+{
+	if (!node || !node.isSeq()) return 0;
+
+	// Anchor count is bounded only by mod-supplied YAML - duplicates and
+	// out-of-range entries are silently ignored. std::vector avoids any
+	// fixed-cap silent-overflow bug if a mod ever lists > 16 entries.
+	std::vector<int> anchorShade, anchorR, anchorG, anchorB;
+	for (const auto& entry : node.children())
+	{
+		int shade = -1;
+		entry["shade"].tryReadVal(shade);
+		if (shade < 0 || shade > 15) continue;
+		int r, g, b;
+		Palette::readColor(entry["rgb"], r, g, b);
+		anchorShade.push_back(shade);
+		anchorR.push_back(r);
+		anchorG.push_back(g);
+		anchorB.push_back(b);
+	}
+	const int anchors = (int)anchorShade.size();
+	if (anchors == 0) return 0;
+	for (int s = 0; s < 16; ++s)
+	{
+		int lo = -1, hi = -1;
+		for (int a = 0; a < anchors; ++a)
+		{
+			if (anchorShade[a] <= s && (lo < 0 || anchorShade[a] > anchorShade[lo])) lo = a;
+			if (anchorShade[a] >= s && (hi < 0 || anchorShade[a] < anchorShade[hi])) hi = a;
+		}
+		if (lo < 0) lo = hi;
+		if (hi < 0) hi = lo;
+		if (lo == hi)
+		{
+			outTable[s][0] = anchorR[lo];
+			outTable[s][1] = anchorG[lo];
+			outTable[s][2] = anchorB[lo];
+		}
+		else
+		{
+			int span = anchorShade[hi] - anchorShade[lo];
+			int t = s - anchorShade[lo];
+			outTable[s][0] = anchorR[lo] + (anchorR[hi] - anchorR[lo]) * t / span;
+			outTable[s][1] = anchorG[lo] + (anchorG[hi] - anchorG[lo]) * t / span;
+			outTable[s][2] = anchorB[lo] + (anchorB[hi] - anchorB[lo]) * t / span;
+		}
+	}
+	return anchors;
+}
+
+void Mod::getPersonalLightColor(int &r, int &g, int &b) const
+{
+	r = _personalLightColor[0];
+	g = _personalLightColor[1];
+	b = _personalLightColor[2];
+}
+
+void Mod::getFireLightColor(int &r, int &g, int &b) const
+{
+	r = _fireLightColor[0];
+	g = _fireLightColor[1];
+	b = _fireLightColor[2];
 }
 
 /**
@@ -3577,6 +3675,18 @@ void Mod::loadFile(const FileMap::FileRecord &filerec, ModScript &parsers)
 		lighting.tryRead("maxStatic", _maxStaticLightDistance);
 		lighting.tryRead("maxDynamic", _maxDynamicLightDistance);
 		lighting.tryRead("enhanced", _enhancedLighting);
+	}
+	if (const auto& ambientNode = loadDocInfoHelper("ambientLightByShade"))
+	{
+		parseAmbientLightByShade(ambientNode, _ambientColorsByShade);
+	}
+	if (const auto& personalNode = loadDocInfoHelper("personalLightColor"))
+	{
+		Palette::readColor(personalNode, _personalLightColor[0], _personalLightColor[1], _personalLightColor[2]);
+	}
+	if (const auto& fireNode = loadDocInfoHelper("fireLightColor"))
+	{
+		Palette::readColor(fireNode, _fireLightColor[0], _fireLightColor[1], _fireLightColor[2]);
 	}
 }
 
