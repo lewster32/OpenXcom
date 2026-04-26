@@ -35,6 +35,7 @@ private:
 	SDL_Color *_colors;
 	int _count;
 	std::map<int, Uint8*> _blendLUTs;
+	std::map<int, Uint8*> _tintLUTs; ///< Keyed on mix; each LUT is 256 * 4096 bytes (4-bit per-channel grid).
 public:
 	/// Creates a blank palette.
 	Palette();
@@ -59,6 +60,12 @@ public:
 	void copyColor(int index, int r, int g, int b);
 	/// Returns a 256x256 LUT where lut[src*256+dst] = nearest palette index to (opacity*srcRGB + (100-opacity)*dstRGB)/100. Caches one table per requested opacity.
 	const Uint8 *getBlendLUT(int opacity);
+	/// Parses a "#rrggbb" hex colour string. On malformed input logs a warning and returns (255,255,255).
+	static void parseHexColor(const std::string &hex, int &r, int &g, int &b);
+	/// Returns a 256 * 4096 tint LUT for the additive-photon model. The grid index
+	/// is the 4-bit-per-channel bit-packed quantised RGB accumulator (12 bits total).
+	/// Cached per mix value; built lazily.
+	const Uint8 *getTintLUT(int mix);
 	/// Converts a given color into a RGBA color value.
 	static Uint32 getRGBA(SDL_Color* pal, Uint8 color);
 	/// Gets the position of a given palette.

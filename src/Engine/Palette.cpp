@@ -21,6 +21,7 @@
 #include "CrossPlatform.h"
 #include "Exception.h"
 #include "FileMap.h"
+#include "Logger.h"
 
 namespace
 {
@@ -68,6 +69,10 @@ Palette::~Palette()
 {
 	delete[] _colors;
 	for (std::map<int, Uint8*>::iterator it = _blendLUTs.begin(); it != _blendLUTs.end(); ++it)
+	{
+		delete[] it->second;
+	}
+	for (std::map<int, Uint8*>::iterator it = _tintLUTs.begin(); it != _tintLUTs.end(); ++it)
 	{
 		delete[] it->second;
 	}
@@ -264,6 +269,95 @@ const Uint8 *Palette::getBlendLUT(int opacity)
 	}
 	_blendLUTs[opacity] = lut;
 	return lut;
+}
+
+/**
+ * Returns a 256 by 4096 tint LUT for the given mix value (0..100). Cached per mix.
+ * Each entry maps (shadedSrc, 12-bit-packed grid index) to the nearest palette colour
+ * for the additive-photon tint pipeline. Allocates 1 MB per cached mix.
+ */
+const Uint8 *Palette::getTintLUT(int mix)
+{
+	std::map<int, Uint8*>::const_iterator it = _tintLUTs.find(mix);
+	if (it != _tintLUTs.end())
+		return it->second;
+
+	// 4-bit per channel: 16 cells per channel, 4096 cells total, 1 MB LUT per mix value.
+	const int cellsPerChannel = 16;
+	const int cells = 4096;
+	const int step = 16;
+	const int topCell = cellsPerChannel - 1;
+
+	Uint8 *lut = new Uint8[256 * cells];
+	for (int src = 0; src < 256; ++src)
+	{
+		for (int cell = 0; cell < cells; ++cell)
+		{
+			// Unpack the cell index into per-channel quantised values.
+			// Inverse of Tile::quantiseAccumulator: (qR << 8) | (qG << 4) | qB.
+			int qR = (cell >> 8) & 0xF;
+			int qG = (cell >> 4) & 0xF;
+			int qB = cell & 0xF;
+
+			// Reconstruct the cell's representative RGB. The bottom and top cells
+			// snap to 0/255 to preserve two spec invariants: a pure-zero accumulator
+			// must render pitch black, and a fully-saturated accumulator must render
+			// byte-identical to vanilla. All interior cells use the midpoint so
+			// quantisation is unbiased there.
+			int gR = (qR == 0) ? 0 : (qR == topCell) ? 255 : qR * step + step / 2;
+			int gG = (qG == 0) ? 0 : (qG == topCell) ? 255 : qG * step + step / 2;
+			int gB = (qB == 0) ? 0 : (qB == topCell) ? 255 : qB * step + step / 2;
+
+			// Lerp toward white by mix: effective = white + mix/100 * (grid - white).
+			int effR = 255 - mix * (255 - gR) / 100;
+			int effG = 255 - mix * (255 - gG) / 100;
+			int effB = 255 - mix * (255 - gB) / 100;
+
+			// Apply as multiply on source palette colour.
+			SDL_Color target;
+			target.r = (Uint8)(_colors[src].r * effR / 255);
+			target.g = (Uint8)(_colors[src].g * effG / 255);
+			target.b = (Uint8)(_colors[src].b * effB / 255);
+
+			lut[src * cells + cell] = nearestIndex(_colors, target);
+		}
+	}
+	_tintLUTs[mix] = lut;
+	return lut;
+}
+
+/**
+ * Parses a `#rrggbb` hex colour string into out-parameter RGB triple.
+ * On malformed input (wrong length, missing leading `#`, bad hex chars) logs
+ * a warning and returns white (255, 255, 255).
+ */
+void Palette::parseHexColor(const std::string &hex, int &r, int &g, int &b)
+{
+	r = g = b = 255;
+	if (hex.size() != 7 || hex[0] != '#')
+	{
+		Log(LOG_WARNING) << "parseHexColor: malformed colour '" << hex << "', defaulting to #ffffff";
+		return;
+	}
+	auto nib = [](char c) -> int {
+		if (c >= '0' && c <= '9') return c - '0';
+		if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+		if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+		return -1;
+	};
+	int values[6];
+	for (int i = 0; i < 6; ++i)
+	{
+		values[i] = nib(hex[i + 1]);
+		if (values[i] < 0)
+		{
+			Log(LOG_WARNING) << "parseHexColor: non-hex char in '" << hex << "', defaulting to #ffffff";
+			return;
+		}
+	}
+	r = (values[0] << 4) | values[1];
+	g = (values[2] << 4) | values[3];
+	b = (values[4] << 4) | values[5];
 }
 
 void Palette::setColors(SDL_Color* pal, int ncolors)
