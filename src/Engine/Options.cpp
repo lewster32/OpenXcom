@@ -51,6 +51,7 @@ std::string _configFolder;
 std::vector<std::string> _userList;
 std::map<std::string, std::string> _commandLine;
 std::vector<OptionInfo> _info;
+std::vector<OptionPair> _pairings;
 std::map<std::string, ModInfo> _modInfos;
 std::string _masterMod;
 int _passwordCheck = -1;
@@ -1415,6 +1416,15 @@ std::string getMasterUserFolder()
 const std::vector<OptionInfo> &getOptionInfo()
 {
 	return _info;
+}
+
+/**
+ * Returns the game's list of declared co-dependent option pairings.
+ * @return List of OptionPair entries.
+ */
+const std::vector<OptionPair> &getOptionPairings()
+{
+	return _pairings;
 }
 
 /**
