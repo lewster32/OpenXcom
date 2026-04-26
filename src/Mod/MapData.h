@@ -18,6 +18,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "RuleItem.h"
+#include "../Battlescape/Position.h"
 
 namespace OpenXcom
 {
@@ -58,6 +59,12 @@ private:
 	int _yOffset, _TUWalk, _TUFly, _TUSlide, _terrainLevel, _footstepSound, _dieMCD, _altMCD;
 	TilePart _objectType;
 	int _lightSource;
+	int _modLightSource;
+	bool _hasModLightSource;
+	Position _lightOffset;
+	int _lightColorR, _lightColorG, _lightColorB;
+	int _modLightColorR, _modLightColorG, _modLightColorB;
+	bool _hasModLightColor;
 	int _armor, _flammable, _fuel, _explosive, _explosiveType, _bigWall;
 	int _sprite[8];
 	int _block[6];
@@ -125,10 +132,28 @@ public:
 	int getDieMCD() const;
 	/// Sets the dead object ID.
 	void setDieMCD(int value);
-	/// Gets the amount of light the object is emitting.
+	/// Gets the effective lightSource. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied value (if any) wins; otherwise the vanilla / auto-derived value is returned.
 	int getLightSource() const;
-	/// Sets the amount of light the object is emitting.
+	/// Sets the vanilla / auto-derived lightSource (called from MCD parsing).
 	void setLightSource(int value);
+	/// Sets the mod-supplied lightSource override (called from MCDPatch when AllowOverride is on).
+	void setModLightSource(int value);
+	/// True iff a mod-supplied lightSource override has been recorded.
+	bool hasModLightSource() const { return _hasModLightSource; }
+	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses Options::oxceBattleColourLightAllowOverride so callers like Mod::autoDeriveLightColors can iterate every part that could ever emit.
+	bool hasAnyLightSource() const { return _lightSource > 0 || _hasModLightSource; }
+	/// Gets the light emission point offset in voxel coords.
+	Position getLightOffset() const;
+	/// Sets the light emission point offset.
+	void setLightOffset(Position offset);
+	/// Gets the effective lightColour. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins; otherwise the auto-derived (or vanilla default) colour is returned.
+	void getLightColor(int &r, int &g, int &b) const;
+	/// Sets the auto-derived (or default) lightColour.
+	void setLightColor(int r, int g, int b);
+	/// Sets the mod-supplied lightColour override (called from MCDPatch).
+	void setModLightColor(int r, int g, int b);
+	/// True iff a mod-supplied lightColour override has been recorded.
+	bool hasModLightColor() const { return _hasModLightColor; }
 	/// Gets the amount of armor.
 	int getArmor() const;
 	/// Sets the amount of armor.

@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "MapData.h"
+#include "../Engine/Options.h"
 
 namespace OpenXcom
 {
@@ -25,9 +26,13 @@ namespace OpenXcom
  * Creates a new Map Data Object.
  * @param dataset The dataset this object belongs to.
  */
-MapData::MapData(MapDataSet *dataset) : _dataset(dataset), _specialType(TILE), 
+MapData::MapData(MapDataSet *dataset) : _dataset(dataset), _specialType(TILE),
 				_isUfoDoor(false), _stopLOS(false), _isNoFloor(false), _isGravLift(false), _isDoor(false), _blockFire(false), _blockSmoke(false), _baseModule(false),
 				_yOffset(0), _TUWalk(0), _TUFly(0), _TUSlide(0), _terrainLevel(0), _footstepSound(0), _dieMCD(0), _altMCD(0), _objectType(O_FLOOR), _lightSource(0),
+				_modLightSource(0), _hasModLightSource(false),
+				_lightOffset(0, 0, 0),
+				_lightColorR(255), _lightColorG(255), _lightColorB(255),
+				_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
 				_armor(0), _flammable(0), _fuel(0), _explosive(0), _explosiveType(0), _bigWall(0), _miniMapIndex(0)
 {
 	std::fill_n(_sprite, 8, 0);
@@ -370,25 +375,109 @@ void MapData::setDieMCD(int value)
 }
 
 /**
- * Gets the amount of light the object is emitting.
- * @return The amount of light emitted.
+ * Gets the effective lightSource.
+ * With Options::oxceBattleColourLightAllowOverride on, the mod-supplied value (if any) wins;
+ * otherwise the vanilla / auto-derived value is returned.
+ * @return The effective light emission strength.
  */
 int MapData::getLightSource() const
 {
+	int value = _lightSource;
+	if (Options::oxceBattleColourLightAllowOverride && _hasModLightSource)
+		value = _modLightSource;
 	// lamp posts have 1, but they should emit more light
-	if (_lightSource == 1)
+	if (value == 1)
 		return 15;
 	else
-		return _lightSource - 1;
+		return value - 1;
 }
 
 /**
- * Sets the amount of light the object is emitting.
+ * Sets the vanilla / auto-derived lightSource (called from MCD parsing).
  * @param value The amount of light emitted.
  */
 void MapData::setLightSource(int value)
 {
 	_lightSource = value;
+}
+
+/**
+ * Sets the mod-supplied lightSource override (called from MCDPatch when AllowOverride is on).
+ * @param value The mod-supplied light emission strength.
+ */
+void MapData::setModLightSource(int value)
+{
+	_modLightSource = value;
+	_hasModLightSource = true;
+}
+
+/**
+ * Gets the light emission point offset in voxel coords.
+ * @return The offset as a Position.
+ */
+Position MapData::getLightOffset() const
+{
+	return _lightOffset;
+}
+
+/**
+ * Sets the light emission point offset.
+ * @param offset The emission point in voxel coords.
+ */
+void MapData::setLightOffset(Position offset)
+{
+	_lightOffset = offset;
+}
+
+/**
+ * Gets the effective lightColour.
+ * With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins;
+ * otherwise the auto-derived (or vanilla default) colour is returned.
+ * @param r Red channel (out).
+ * @param g Green channel (out).
+ * @param b Blue channel (out).
+ */
+void MapData::getLightColor(int &r, int &g, int &b) const
+{
+	if (Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
+	{
+		r = _modLightColorR;
+		g = _modLightColorG;
+		b = _modLightColorB;
+	}
+	else
+	{
+		r = _lightColorR;
+		g = _lightColorG;
+		b = _lightColorB;
+	}
+}
+
+/**
+ * Sets the auto-derived (or default) lightColour.
+ * @param r Red channel.
+ * @param g Green channel.
+ * @param b Blue channel.
+ */
+void MapData::setLightColor(int r, int g, int b)
+{
+	_lightColorR = r;
+	_lightColorG = g;
+	_lightColorB = b;
+}
+
+/**
+ * Sets the mod-supplied lightColour override (called from MCDPatch).
+ * @param r Red channel.
+ * @param g Green channel.
+ * @param b Blue channel.
+ */
+void MapData::setModLightColor(int r, int g, int b)
+{
+	_modLightColorR = r;
+	_modLightColorG = g;
+	_modLightColorB = b;
+	_hasModLightColor = true;
 }
 
 /**
