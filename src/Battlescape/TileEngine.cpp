@@ -1641,7 +1641,11 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 	    ? (lightOffset / divide)
 	    : (accuracy / 2 + Position(-1, -1, (ground ? 0 : accuracy.z/4) - tileHeight * accuracy.z / 24));
 	const auto offsetTarget = (accuracy / 2 + Position(-1, -1, 0));
-	const auto clasicLighting = bypassLOS || !(getEnhancedLighting() & ((fire ? 1 : 0) | (items ? 2 : 0) | (units ? 4 : 0)));
+	// oxceBattleRealisticLighting forces LOS-traced propagation for all light sources
+	// regardless of the mod's `lighting: { enhanced: N }` bitmask or the caller's
+	// bypassLOS hint. With it off, the original bypassLOS-then-mod-bits semantics apply.
+	const auto modBitsSet = getEnhancedLighting() & ((fire ? 1 : 0) | (items ? 2 : 0) | (units ? 4 : 0));
+	const auto clasicLighting = !Options::oxceBattleRealisticLighting && (bypassLOS || !modBitsSet);
 	const auto topTargetVoxel = static_cast<Sint16>(_save->getMapSizeZ() * accuracy.z - 1);
 	const auto topCenterVoxel = static_cast<Sint16>((getBlockUp(_blockVisibility[_save->getTileIndex(center)]) ? (center.z + 1) : _save->getMapSizeZ()) * accuracy.z - 1);
 	const auto maxFirePower = std::min(15, getMaxStaticLightDistance() - 1);
