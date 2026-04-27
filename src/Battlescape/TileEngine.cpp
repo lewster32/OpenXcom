@@ -1131,14 +1131,14 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		int winR = 255, winG = 255, winB = 255;
 		bool winBypassLOS = false;
 
-		// Personal armour light - bypasses LOS so it always reaches the unit's own tile.
+		// Personal armour light: respects LOS when realistic lighting is on (so torches no longer wrap around walls), otherwise bypasses for vanilla wrap-around behaviour.
 		auto tryPersonalLight = [&](int personalPower)
 		{
 			if (personalPower > currLight)
 			{
 				currLight = personalPower;
 				_save->getMod()->getPersonalLightColor(winR, winG, winB);
-				winBypassLOS = true;
+				winBypassLOS = !Options::oxceBattleRealisticLighting;
 			}
 		};
 
@@ -1168,7 +1168,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 				{
 					currLight = glowRange;
 					w->getRules()->getLightColor(winR, winG, winB);
-					winBypassLOS = true;
+					winBypassLOS = !Options::oxceBattleRealisticLighting;
 				}
 			}
 
