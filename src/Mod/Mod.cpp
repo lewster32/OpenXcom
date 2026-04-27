@@ -149,6 +149,23 @@ struct OxceVersionDate
 };
 
 
+// Tunables for the "emitted-colour" derivation heuristic in deriveRGBFromSurface.
+constexpr float EMIT_BRIGHT_FRAC = 0.95f;   // bright-cluster threshold as a fraction of max V (HSV value)
+constexpr float EMIT_SAT_PRIMARY = 0.30f;   // bright-cluster pick must reach this saturation to be returned directly
+constexpr int   EMIT_NB_RADIUS   = 3;       // square radius (in source pixels) around the cluster centroid for the adjacency probe
+constexpr float EMIT_SAT_FALLBACK = 0.20f;  // adjacency probe accepts pixels with saturation >= this
+
+/// HSV V (max channel / 255) and S ((max-min)/max) for a single 8-bit RGB triple.
+inline void hsvValSat(int r, int g, int b, float &v, float &s)
+{
+	int mx = std::max({ r, g, b });
+	if (mx == 0) { v = 0.0f; s = 0.0f; return; }
+	int mn = std::min({ r, g, b });
+	v = mx / 255.0f;
+	s = (mx - mn) / static_cast<float>(mx);
+}
+
+
 } //namespace
 
 
@@ -6768,8 +6785,22 @@ void Mod::ScriptRegister(ScriptParserBase *parser)
 }
 
 /**
- * Averages the non-transparent pixels of a paletted Surface and returns their
- * mean RGB. Palette index 0 is the transparency sentinel and is skipped.
+ * Picks an "emitted-light" RGB from a paletted Surface using a bright-cluster
+ * heuristic that approximates how a viewer reads the colour of a glowing spot
+ * on a sprite. Palette index 0 is the transparency sentinel and is skipped.
+ *
+ * Strategy (in order):
+ *   1. Bright cluster = pixels with V (HSV value, max-channel/255) within
+ *      EMIT_BRIGHT_FRAC of the sprite's max V.
+ *   2. Most-saturated cluster pixel; if its S >= EMIT_SAT_PRIMARY, return it.
+ *      Catches already-saturated bright spots (a red glowing pod, a yellow
+ *      lamp head, etc.).
+ *   3. Otherwise the bright spot is white/grey: scan a Chebyshev radius
+ *      EMIT_NB_RADIUS around the cluster centroid for the pixel that
+ *      maximises S*V (with S >= EMIT_SAT_FALLBACK). This catches the coloured
+ *      glow / bleed adjacent to a white-hot core.
+ *   4. Final fallback: the brightest cluster pixel as-is.
+ *
  * Returns false when the frame is null, the palette is null, or the sprite
  * contained no non-transparent pixels (e.g. empty / fully-transparent frame).
  * Caller must have resolved the Surface pointer on the main thread before
@@ -6779,29 +6810,86 @@ bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g,
 {
 	if (!frame || !palette) return false;
 
-	long long sumR = 0, sumG = 0, sumB = 0, n = 0;
 	const SDL_Color *colors = palette->getColors(0);
 	SDL_Surface *sdl = frame->getSurface();
 	const Uint8 *pixels = (const Uint8*)sdl->pixels;
 	int w = frame->getWidth(), h = frame->getHeight();
 	int pitch = sdl->pitch;
+
+	struct Pixel { int x, y, r, g, b; float v, s; };
+	std::vector<Pixel> pix;
+	pix.reserve(static_cast<size_t>(w) * h);
+
+	float maxV = 0.0f;
 	for (int y = 0; y < h; ++y)
 	{
 		for (int x = 0; x < w; ++x)
 		{
 			Uint8 idx = pixels[y * pitch + x];
 			if (idx == 0) continue; // palette index 0 = transparent
-			sumR += colors[idx].r;
-			sumG += colors[idx].g;
-			sumB += colors[idx].b;
-			++n;
+			int pr = colors[idx].r, pg = colors[idx].g, pb = colors[idx].b;
+			float vv, ss;
+			hsvValSat(pr, pg, pb, vv, ss);
+			Pixel p = { x, y, pr, pg, pb, vv, ss };
+			pix.push_back(p);
+			if (vv > maxV) maxV = vv;
 		}
 	}
-	if (n == 0) return false;
-	r = (int)(sumR / n);
-	g = (int)(sumG / n);
-	b = (int)(sumB / n);
-	return true;
+	if (pix.empty()) return false;
+	if (maxV <= 0.0f) { r = 0; g = 0; b = 0; return true; } // all-black sprite
+
+	// Step 1+2: walk the bright cluster, track the most-saturated pixel + centroid.
+	const float clusterThreshold = maxV * EMIT_BRIGHT_FRAC;
+	const Pixel *clusterBest = 0;
+	const Pixel *clusterBrightest = 0;
+	long long sumX = 0, sumY = 0;
+	int clusterCount = 0;
+	for (size_t i = 0; i < pix.size(); ++i)
+	{
+		const Pixel &p = pix[i];
+		if (p.v < clusterThreshold) continue;
+		sumX += p.x; sumY += p.y; ++clusterCount;
+		if (!clusterBest || p.s > clusterBest->s) clusterBest = &p;
+		if (!clusterBrightest || p.v > clusterBrightest->v) clusterBrightest = &p;
+	}
+	if (clusterBest && clusterBest->s >= EMIT_SAT_PRIMARY)
+	{
+		r = clusterBest->r; g = clusterBest->g; b = clusterBest->b;
+		return true;
+	}
+
+	// Step 3: cluster is desaturated (white/grey). Probe a Chebyshev radius
+	// around the cluster centroid for a saturated bleed/glow pixel.
+	if (clusterCount > 0)
+	{
+		int cxRound = static_cast<int>(sumX / clusterCount);
+		int cyRound = static_cast<int>(sumY / clusterCount);
+		const Pixel *nearbyBest = 0;
+		float nearbyScore = -1.0f;
+		for (size_t i = 0; i < pix.size(); ++i)
+		{
+			const Pixel &p = pix[i];
+			int dx = p.x - cxRound; if (dx < 0) dx = -dx;
+			int dy = p.y - cyRound; if (dy < 0) dy = -dy;
+			if (dx > EMIT_NB_RADIUS || dy > EMIT_NB_RADIUS) continue;
+			if (p.s < EMIT_SAT_FALLBACK) continue;
+			float score = p.s * p.v;
+			if (!nearbyBest || score > nearbyScore) { nearbyBest = &p; nearbyScore = score; }
+		}
+		if (nearbyBest)
+		{
+			r = nearbyBest->r; g = nearbyBest->g; b = nearbyBest->b;
+			return true;
+		}
+	}
+
+	// Step 4: nothing saturated nearby - return the brightest cluster pixel as-is.
+	if (clusterBrightest)
+	{
+		r = clusterBrightest->r; g = clusterBrightest->g; b = clusterBrightest->b;
+		return true;
+	}
+	return false; // unreachable: pix is non-empty and maxV > 0 -> cluster is non-empty
 }
 
 /**

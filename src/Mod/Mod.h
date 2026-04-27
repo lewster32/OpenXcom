@@ -382,7 +382,7 @@ private:
 	Music* loadMusic(MusicFormat fmt, RuleMusic* rule, CatFile* adlibcat, CatFile* aintrocat, GMCatFile* gmcat) const;
 	/// Creates a transparency lookup table for a given palette.
 	void createTransparencyLUT(Palette *pal);
-	/// Averages non-transparent (palette index != 0) RGB pixels of the given Surface against the given Palette. Returns false if no usable pixels. Caller must resolve the Surface from a SurfaceSet on the main thread (SurfaceSet::getFrame is not thread-safe).
+	/// Picks an "emitted-light" RGB from a paletted Surface using a bright-cluster heuristic (top-V pixels, most-saturated pick, adjacency probe for white cores). Returns false if no usable pixels. Caller must resolve the Surface from a SurfaceSet on the main thread (SurfaceSet::getFrame is not thread-safe).
 	bool deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g, int &b) const;
 	/// Auto-derives _lightColor RGB triples for items / map data on the auto-derive track (independent of mod-supplied overrides). Runs unconditionally at mod load.
 	void autoDeriveLightColors();
