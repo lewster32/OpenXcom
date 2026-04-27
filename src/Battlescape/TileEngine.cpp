@@ -1192,6 +1192,16 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			currLight = getMaxDynamicLightDistance() - 1;
 		}
+		// Realistic-lighting tuning: cap unit-emitted light power at 8 to prevent over-lighting
+		// under LOS-traced propagation. Vanilla soldier flashlights and unit fire reach 15 tiles
+		// because they wrap around walls; with LOS active, the same power floods rooms with
+		// over-saturated colour. Source-of-truth uses fixed power 8 for personal light and unit
+		// fire under realistic; this single cap applies the same intent to whatever source won
+		// (personal light, hand-weapon glow, or unit on fire).
+		if (Options::oxceBattleRealisticLighting && currLight > 8)
+		{
+			currLight = 8;
+		}
 		const auto size = unit->getArmor()->getSize();
 		const auto pos = unit->getPosition();
 		for (int x = 0; x < size; ++x)
