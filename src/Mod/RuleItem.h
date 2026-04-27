@@ -478,6 +478,8 @@ private:
 	int _lightColorR, _lightColorG, _lightColorB;          // auto-derived (or vanilla default white) lightColor track
 	int _modLightColorR, _modLightColorG, _modLightColorB; // mod-supplied lightColor (from item YAML)
 	bool _hasModLightColor;
+	// Tri-state: -1 unset (legacy auto: BT_FLARE -> fullbright), 0 forced off, 1 forced on.
+	int _fullBright;
 	std::vector<int> _customItemPreviewIndex;
 	int _kneelBonus, _oneHandedPenalty;
 	int _monthlySalary, _monthlyMaintenance;
@@ -678,6 +680,8 @@ public:
 	void setModLightColor(int r, int g, int b);
 	/// True iff a mod-supplied lightColor override has been recorded for this item.
 	bool hasModLightColor() const { return _hasModLightColor; }
+	/// True iff this item should be rendered fullbright (sprite at max shade, no tint LUT). Default: legacy auto-detect (BT_FLARE -> fullbright); modders override per-item via `fullBright: true/false` in item YAML.
+	bool getFullBright() const;
 	/// Gets the item's power used for AoE explosion animation.
 	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?

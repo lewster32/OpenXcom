@@ -65,6 +65,8 @@ private:
 	int _lightColorR, _lightColorG, _lightColorB;
 	int _modLightColorR, _modLightColorG, _modLightColorB;
 	bool _hasModLightColor;
+	// Tri-state: -1 = unset (legacy auto from getLightSource()), 0 = forced off, 1 = forced on.
+	int _fullBright;
 	int _armor, _flammable, _fuel, _explosive, _explosiveType, _bigWall;
 	int _sprite[8];
 	int _block[6];
@@ -152,6 +154,10 @@ public:
 	void setLightColor(int r, int g, int b);
 	/// Sets the mod-supplied lightColour override (called from MCDPatch).
 	void setModLightColor(int r, int g, int b);
+	/// True iff this part should be rendered fullbright (sprite at max shade, no tint LUT). Default: legacy auto-detect from getLightSource() > 0; modders override per-part via `fullBright: true/false` in MCDPatch.
+	bool getFullBright() const;
+	/// Sets the fullBright override (called from MCDPatch). v=-1 unset, 0 off, 1 on.
+	void setFullBright(int v) { _fullBright = v; }
 	/// True iff a mod-supplied lightColour override has been recorded.
 	bool hasModLightColor() const { return _hasModLightColor; }
 	/// Gets the amount of armor.

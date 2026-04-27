@@ -155,6 +155,11 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 			rgb.push_back(b);
 			_lightColors.push_back(std::make_pair(MCDIndex, rgb));
 		}
+		if (mcd["fullBright"])
+		{
+			bool fullBright = mcd["fullBright"].readVal<bool>();
+			_fullBrights.push_back(std::make_pair(MCDIndex, fullBright ? 1 : 0));
+		}
 	}
 }
 
@@ -254,6 +259,10 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 		md->setModLightColor(rgb[0], rgb[1], rgb[2]);
 		if (!md->hasModLightSource() && md->getLightSource() <= 0)
 			md->setModLightSource(1);
+	}
+	for (const auto& pair : _fullBrights)
+	{
+		dataSet->getObject(pair.first)->setFullBright(pair.second);
 	}
 }
 

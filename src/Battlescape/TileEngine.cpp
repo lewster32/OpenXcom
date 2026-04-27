@@ -1026,7 +1026,7 @@ const int unitFireLightPower = 15;
 const int unitFireLightPowerStunned = 10;
 
 /// amount of light a unit generates when oxceBattleRealisticLighting is on
-const int realisticUnitLightPower = 10;
+const int realisticUnitLightPower = 12;
 
 /**
   * Recalculates lighting for the terrain: fire.
@@ -1359,16 +1359,29 @@ void TileEngine::finaliseTintPass()
 	if (!Options::oxceBattleRealisticLighting) return;
 
 	// Resolve ambient RGB for this global shade.
-	// Per-mission AlienDeployment override takes precedence over the mod-wide default.
+	// Gate: oxceBattleColourLightAmbient. When off, fall back to a neutral greyscale
+	// ramp so users can disable mod-supplied coloured ambient without disabling the
+	// rest of the coloured-lighting pipeline. Greyscale matches vanilla shade
+	// behaviour: v = 255 - globalShade * 17.
+	// When on, per-mission AlienDeployment override takes precedence over the mod-wide default.
 	int ambR, ambG, ambB;
-	AlienDeployment *dep = _save->getMod()->getDeployment(_save->getMissionType(), false);
-	if (dep && dep->hasAmbientLightByShade())
+	if (Options::oxceBattleColourLightAmbient)
 	{
-		dep->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+		AlienDeployment *dep = _save->getMod()->getDeployment(_save->getMissionType(), false);
+		if (dep && dep->hasAmbientLightByShade())
+		{
+			dep->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+		}
+		else
+		{
+			_save->getMod()->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+		}
 	}
 	else
 	{
-		_save->getMod()->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
+		int v = 255 - _save->getGlobalShade() * 17;
+		if (v < 0) v = 0;
+		ambR = ambG = ambB = v;
 	}
 
 	// Write ambient * skyVisibility into LL_AMBIENT for all 4 corners of every tile.
@@ -1674,13 +1687,12 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			const auto targetLight = tile->getLightMulti(layer);
 			auto currLight = power - distance;
 
-			if (currLight <= targetLight)
-			{
-				return;
-			}
 			if (clasicLighting)
 			{
-				tile->addLight(currLight, layer);
+				// RGB is additive across sources - write the contribution unconditionally so
+				// multiple sources at the same tile mix. Scalar light keeps its max-wins
+				// semantics (a brighter source still suppresses dimmer scalar updates).
+				if (currLight > 0)
 				{
 					const int cR = lightR * currLight / 15;
 					const int cG = lightG * currLight / 15;
@@ -1688,9 +1700,13 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 					for (int c = 0; c < 4; ++c)
 						tile->addLightRGB(cR, cG, cB, layer, c);
 				}
+				if (currLight > targetLight)
+				{
+					tile->addLight(currLight, layer);
+				}
 				return;
 			}
-			if (_lightPropagationTempNeedUpdate[idx] == 0)
+			if (currLight <= targetLight && _lightPropagationTempNeedUpdate[idx] == 0)
 			{
 				return;
 			}
@@ -1711,8 +1727,10 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			Position lastTileB = center;
 			auto stepsA = 0;
 			auto stepsB = 0;
-			auto lightA = currLight;
-			auto lightB = currLight;
+			// Named losPowerA/losPowerB (not lightA/lightB) to avoid shadowing the
+			// `lightB` parameter (blue channel of the light colour) in this scope.
+			auto losPowerA = currLight;
+			auto losPowerB = currLight;
 
 			//Do not peek out your head outside map
 			startVoxel.z = std::min(startVoxel.z, topCenterVoxel);
@@ -1754,7 +1772,15 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 					{
 						light -= 1;
 					}
-					if (height < cache.height)
+					// Under-step (path's voxel-z is below the next tile's cached blocker height)
+					// would normally cost 2 power per step. That penalty is what kills terrain
+					// MCD lights inside the Avenger / craft hulls (every step under tall hull
+					// objects shaves -2). Source-of-truth coloured-lighting used a binary LOS
+					// (clear or blocked, no per-step decay), so under realistic-lighting we
+					// match it - walls still hard-block via getBlockDir above, and smoke decay
+					// stays for gameplay nuance. OXCE mods opting in via `lighting: { enhanced: N }`
+					// (with realistic-lighting OFF) keep the original penalty for tuning parity.
+					if (!Options::oxceBattleRealisticLighting && height < cache.height)
 					{
 						light -= 2;
 					}
@@ -1772,8 +1798,8 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			calculateLineHelper(startVoxel, endVoxel,
 				[&](Position voxel)
 				{
-					auto resultA = calculateBlock(voxel, lastTileA, lightA, stepsA);
-					auto resultB = calculateBlock(voxel + offsetB, lastTileB, lightB, stepsB);
+					auto resultA = calculateBlock(voxel, lastTileA, losPowerA, stepsA);
+					auto resultB = calculateBlock(voxel + offsetB, lastTileB, losPowerB, stepsB);
 					return resultA && resultB;
 				},
 				[&](Position voxel)
@@ -1782,17 +1808,21 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 				}
 			);
 
-			currLight = (lightA + lightB) / 2;
+			currLight = (losPowerA + losPowerB) / 2;
+			// RGB is additive across sources - write the LOS-attenuated contribution
+			// unconditionally so multiple sources mix. Scalar light keeps its
+			// max-wins semantics below.
+			if (currLight > 0)
+			{
+				const int cR = lightR * currLight / 15;
+				const int cG = lightG * currLight / 15;
+				const int cB = lightB * currLight / 15;
+				for (int c = 0; c < 4; ++c)
+					tile->addLightRGB(cR, cG, cB, layer, c);
+			}
 			if (currLight > targetLight)
 			{
 				tile->addLight(currLight, layer);
-				{
-					const int cR = lightR * currLight / 15;
-					const int cG = lightG * currLight / 15;
-					const int cB = lightB * currLight / 15;
-					for (int c = 0; c < 4; ++c)
-						tile->addLightRGB(cR, cG, cB, layer, c);
-				}
 			}
 		}
 	);

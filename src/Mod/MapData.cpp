@@ -33,6 +33,7 @@ MapData::MapData(MapDataSet *dataset) : _dataset(dataset), _specialType(TILE),
 				_lightOffset(0, 0, 0),
 				_lightColorR(255), _lightColorG(255), _lightColorB(255),
 				_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
+				_fullBright(-1),
 				_armor(0), _flammable(0), _fuel(0), _explosive(0), _explosiveType(0), _bigWall(0), _miniMapIndex(0)
 {
 	std::fill_n(_sprite, 8, 0);
@@ -427,6 +428,20 @@ Position MapData::getLightOffset() const
 void MapData::setLightOffset(Position offset)
 {
 	_lightOffset = offset;
+}
+
+/**
+ * Whether this MCD should be rendered fullbright (sprite at max shade, no tint LUT applied).
+ * If the modder didn't set `fullBright`, fall back to the legacy auto-detect: anything
+ * with a non-zero lightSource was historically drawn fullbright, so preserve that for
+ * backwards compatibility. An explicit `fullBright: false` opts out (useful for large
+ * objects like alien tanks where only a small panel actually glows).
+ */
+bool MapData::getFullBright() const
+{
+	if (_fullBright == -1)
+		return getLightSource() > 0;
+	return _fullBright != 0;
 }
 
 /**

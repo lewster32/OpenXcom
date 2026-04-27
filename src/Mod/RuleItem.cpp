@@ -186,6 +186,7 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_vaporColorSurface(-1), _vaporDensitySurface(0), _vaporProbabilitySurface(15),
 	_lightColorR(255), _lightColorG(255), _lightColorB(255),
 	_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
+	_fullBright(-1),
 	_kneelBonus(-1), _oneHandedPenalty(-1),
 	_monthlySalary(0), _monthlyMaintenance(0),
 	_sprayWaypoints(0)
@@ -665,6 +666,10 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 		int r, g, b;
 		Palette::readColor(reader["lightColor"], r, g, b);
 		setModLightColor(r, g, b);
+	}
+	if (reader["fullBright"])
+	{
+		_fullBright = reader["fullBright"].readVal<bool>() ? 1 : 0;
 	}
 
 	mod->loadSpriteOffset(_type, _customItemPreviewIndex, reader["customItemPreviewIndex"], "CustomItemPreviews");
@@ -1378,6 +1383,19 @@ void RuleItem::setModLightColor(int r, int g, int b)
 	_modLightColorG = g;
 	_modLightColorB = b;
 	_hasModLightColor = true;
+}
+
+/**
+ * Whether this item should be rendered fullbright (sprite at max shade, no tint LUT applied).
+ * If the modder didn't set `fullBright`, fall back to the legacy auto-detect: BT_FLARE items
+ * were always drawn fullbright. An explicit `fullBright: false` opts out, an explicit
+ * `fullBright: true` opts in for any item type.
+ */
+bool RuleItem::getFullBright() const
+{
+	if (_fullBright == -1)
+		return _battleType == BT_FLARE;
+	return _fullBright != 0;
 }
 
 /**
