@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "OptionsAdvancedState.h"
+#include <set>
 #include <sstream>
 #include "../Engine/Game.h"
 #include "../Mod/Mod.h"
@@ -29,6 +30,9 @@
 #include "../Engine/Options.h"
 #include "../Engine/Action.h"
 #include <algorithm>
+#include "../Savegame/SavedGame.h"
+#include "../Savegame/SavedBattleGame.h"
+#include "../Battlescape/TileEngine.h"
 
 namespace OpenXcom
 {
@@ -268,6 +272,11 @@ void OptionsAdvancedState::addSettings(const std::vector<OptionInfo> &settings)
 		{
 			_lstOptions->setRowColor(_lstOptions->getLastRowIndex(), _greyedOutColor);
 		}
+		else if (isOptionDisabled(optionInfo))
+		{
+			_lstOptions->setCellColor(_lstOptions->getLastRowIndex(), 0, _greyedOutColor);
+			_lstOptions->setCellColor(_lstOptions->getLastRowIndex(), 1, _greyedOutColor);
+		}
 	}
 }
 
@@ -360,6 +369,11 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		return;
 	}
 
+	// Locked out by an OptionGate whose controller bool is false. Refuse the
+	// click silently so the value stays as it was when the gate closed -
+	// re-opening the gate restores the visible/editable state.
+	if (isOptionDisabled(*setting)) return;
+
 	std::string settingText;
 	if (setting->type() == OPTION_BOOL)
 	{
@@ -370,6 +384,21 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		{
 			Options::reload = true; // reload when turning lazy loading off
 		}
+		// Recalc lighting if this option changes anything the lighting pipeline
+		// depends on. oxceBattleRealisticLighting is the master gate.
+		// oxceBattleColourLightAllowOverride flips which dual-track lightColor /
+		// lightSource is used at runtime so a recalc rebuilds the accumulator.
+		// The others alter the shape of the per-tile/per-corner data.
+		if (b == &Options::oxceBattleRealisticLighting ||
+			b == &Options::oxceBattleColourLightPerCorner ||
+			b == &Options::oxceBattleColourLightAmbient ||
+			b == &Options::oxceBattleColourLightAllowOverride)
+		{
+			recalculateBattleLighting();
+		}
+		// Toggling a bool may have changed the state of an OptionGate it
+		// controls - repaint dependent rows so their disabled state stays in sync.
+		refreshDisabledRowColors();
 	}
 	else if (setting->type() == OPTION_INT) // integer variables will need special handling
 	{
@@ -377,7 +406,8 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 
 		int increment = (button == SDL_BUTTON_LEFT) ? 1 : -1; // left-click increases, right-click decreases
 		if (i == &Options::changeValueByMouseWheel || i == &Options::FPS || i == &Options::FPSInactive || i == &Options::oxceWoundedDefendBaseIf
-			|| i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin)
+			|| i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin
+			|| i == &Options::oxceBattleColourLightMix)
 		{
 			increment *= 10;
 		}
@@ -455,6 +485,17 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			min = 10;
 			max = 100;
 		}
+		else if (i == &Options::oxceBattleColourLightMix)
+		{
+			min = 0;
+			max = 100;
+		}
+		else if (i == &Options::oxceBattleColourLightDither)
+		{
+			// 0 = None, 1 = Bayer, 2 = Floyd-Steinberg
+			min = 0;
+			max = 2;
+		}
 		else if (i == &Options::oxceAutoNightVisionThreshold) {
 			min = 0;
 			max = 15;
@@ -494,6 +535,13 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			break;
 		}
 
+		// Mix changes the tintLUT row and finaliseTintPass output - needs a full
+		// recalc so the per-tile gridIdx is rebuilt against the new mix.
+		if (i == &Options::oxceBattleColourLightMix)
+		{
+			recalculateBattleLighting();
+		}
+
 		std::ostringstream ss;
 		ss << *i;
 		settingText = ss.str();
@@ -521,6 +569,91 @@ void OptionsAdvancedState::lstOptionsMouseOut(Action *)
 void OptionsAdvancedState::btnGroupPress(Action*)
 {
 	updateList();
+}
+
+/**
+ * True when this option is gated off by an Options::OptionGate whose
+ * controller bool is currently false. Compares the option's storage pointer
+ * (asBool / asInt) against each gate's dependent list; pointer equality is
+ * sufficient since every option has a unique storage address.
+ */
+bool OptionsAdvancedState::isOptionDisabled(const OptionInfo &setting) const
+{
+	void *p = (setting.type() == OPTION_BOOL) ? (void*)setting.asBool() :
+	          (setting.type() == OPTION_INT)  ? (void*)setting.asInt()  : 0;
+	if (!p) return false;
+	const std::vector<OptionGate> &gates = Options::getOptionGates();
+	for (size_t g = 0; g < gates.size(); ++g)
+	{
+		if (*gates[g].gate) continue; // gate open - dependents allowed
+		for (size_t d = 0; d < gates[g].dependents.size(); ++d)
+		{
+			if (gates[g].dependents[d] == p) return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Walks all settings sections and re-applies the dim/normal colour to each
+ * row whose option appears in any OptionGate's dependent list. Both columns
+ * are dimmed for disabled rows so the value display also signals the disabled
+ * state. Options that are not gated are left untouched.
+ */
+void OptionsAdvancedState::refreshDisabledRowColors()
+{
+	const std::vector<OptionGate> &gates = Options::getOptionGates();
+	std::set<void*> gateable;
+	for (size_t g = 0; g < gates.size(); ++g)
+	{
+		for (size_t d = 0; d < gates[g].dependents.size(); ++d)
+		{
+			gateable.insert(gates[g].dependents[d]);
+		}
+	}
+	if (gateable.empty()) return;
+
+	OptionOwner idx = _owner == _btnOXC ? OPTION_OXC : _owner == _btnOXCE ? OPTION_OXCE : OPTION_OTHER;
+	struct Section { int base; const std::vector<OptionInfo> *settings; };
+	Section sections[5] = {
+		{ _offsetGeneralMin, &_settingsGeneral[idx] },
+		{ _offsetGeoMin,     &_settingsGeo[idx] },
+		{ _offsetBaseMin,    &_settingsBase[idx] },
+		{ _offsetBattleMin,  &_settingsBattle[idx] },
+		{ _offsetAIMin,      &_settingsAI[idx] },
+	};
+	const Uint8 defaultColor = _lstOptions->getColor();
+	for (int s = 0; s < 5; ++s)
+	{
+		if (sections[s].base < 0) continue;
+		const std::vector<OptionInfo> &v = *sections[s].settings;
+		for (size_t i = 0; i < v.size(); ++i)
+		{
+			void *p = (v[i].type() == OPTION_BOOL) ? (void*)v[i].asBool() :
+			          (v[i].type() == OPTION_INT)  ? (void*)v[i].asInt()  : 0;
+			if (!p || !gateable.count(p)) continue;
+			const size_t row = (size_t)(sections[s].base + 1 + (int)i);
+			const Uint8 color = isOptionDisabled(v[i]) ? _greyedOutColor : defaultColor;
+			_lstOptions->setCellColor(row, 0, color);
+			_lstOptions->setCellColor(row, 1, color);
+		}
+	}
+}
+
+/**
+ * Triggers a full lighting recalc on the active battle (no-op if no battle is
+ * running). Needed after toggling any option that changes how light is computed
+ * or how light data is consumed by the renderer.
+ */
+void OptionsAdvancedState::recalculateBattleLighting()
+{
+	SavedGame *save = _game->getSavedGame();
+	if (!save) return;
+	SavedBattleGame *battle = save->getSavedBattle();
+	if (!battle) return;
+	TileEngine *te = battle->getTileEngine();
+	if (!te) return;
+	te->recalculateLighting();
 }
 
 }

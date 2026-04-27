@@ -59,6 +59,12 @@ private:
 	OptionInfo *getSetting(size_t sel);
 	/// Updates the list row whose int option has the given pointer, to reflect the current value.
 	void refreshOptionRow(int *ptr);
+	/// Triggers a full lighting recalculation if a battle is in progress.
+	void recalculateBattleLighting();
+	/// True if setting is gated off by an Options::OptionGate whose controller is currently false.
+	bool isOptionDisabled(const OptionInfo &setting) const;
+	/// Re-applies the disabled visual state to every gateable row in the list.
+	void refreshDisabledRowColors();
 public:
 	/// Creates the Advanced state.
 	OptionsAdvancedState(OptionsOrigin origin);
