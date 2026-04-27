@@ -187,7 +187,17 @@ void UnitDieBState::think()
 	if (_extraFrame == 2)
 	{
 		_parent->getMap()->setUnitDying(false);
-		_parent->getTileEngine()->calculateLighting(LL_ITEMS, _unit->getPosition(), _unit->getArmor()->getSize());
+		// Realistic-lighting needs a full-map recalc on death. The OXCE bounded recalc
+		// relies on `iterateTilesLightMaxBound` flagging every tile the dying unit
+		// could have lit via a tile-level directional flood, but with realistic
+		// lighting the actual light propagation is LOS-traced at voxel level - so
+		// wall-edge tiles the unit lit can be missed by the flag flood, leaving stale
+		// RGB accumulator values that show as a phantom glow until the next event
+		// triggers a wider recalc. In vanilla mode the flood and the wrap-around
+		// light propagation match radius-for-radius, so the original event-bounded
+		// recalc is correct and remains the perf-optimised default.
+		const Position recalcPos = Options::oxceBattleRealisticLighting ? TileEngine::invalid : _unit->getPosition();
+		_parent->getTileEngine()->calculateLighting(LL_ITEMS, recalcPos, _unit->getArmor()->getSize());
 		_parent->getTileEngine()->calculateFOV(_unit->getPosition(), _unit->getArmor()->getSize(), false); //Update FOV for anyone that can see me
 		_parent->popState();
 		if (_unit->getOriginalFaction() == FACTION_PLAYER)

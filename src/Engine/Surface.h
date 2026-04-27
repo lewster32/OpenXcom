@@ -319,8 +319,8 @@ public:
 	static void blitRawBlend(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, const Uint8 *blendLUT);
 	/// Emissive blit: every non-transparent pixel renders at the artist's authored value with no shade modifier. shade>=16 still hard-blacks the sprite for fog-of-war.
 	static void blitRawFullBright(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade);
-	/// Additive-photon tint blit: samples tintLUT[shadedSrc * 4096 + gridIdx]. tintLUT from Palette::getTintLUT(mix); gridIdx from Tile::getGridIdx() / getAvgGridIdx().
-	static void blitRawTint(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT);
+	/// Additive-photon tint blit: samples tintLUT[shadedSrc * 4096 + gridIdx]. tintLUT from Palette::getTintLUT(mix); gridIdx from Tile::getGridIdx() / getAvgGridIdx(). When half=true, clips the source's left half (mirrors blitRaw's half flag - used for north walls so they do not overlap a same-tile west wall at the upper-left corner).
+	static void blitRawTint(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, bool half = false);
 	/// Same as the simpler overload above, clipped to range (used for unit blits where the unit sprite is masked to the per-tile draw region).
 	static void blitRawTint(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range);
 	/// Per-corner floor blit: bilinearly interpolates the 4 corner gridIdxs across the isometric diamond per pixel, optionally dithers, quantises, then samples tintLUT.

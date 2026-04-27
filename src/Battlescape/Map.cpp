@@ -730,6 +730,24 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 	}
 	if (tintLUT)
 	{
+		// A fullbright floor / object renders at shade 0 (max palette brightness)
+		// regardless of propagated light power, so a unit standing on top whose
+		// shade comes from the (often heuristically-reduced) lightSource value
+		// looks much darker than the surface beneath it. Cap the unit's shade
+		// when its tile has any fullbright part, so the unit visually matches
+		// the brightness of what it is standing on. The cap is a small non-zero
+		// value so units retain a touch of self-shading rather than going
+		// completely flat.
+		constexpr int unitFullBrightShade = 2;
+		if (currTile)
+		{
+			const MapData* floor = currTile->getMapData(O_FLOOR);
+			const MapData* obj = currTile->getMapData(O_OBJECT);
+			if ((floor && floor->getFullBright()) || (obj && obj->getFullBright()))
+			{
+				shade = std::min(shade, unitFullBrightShade);
+			}
+		}
 		// Route unit sprite through the additive-photon tint pipeline so it is
 		// coloured by the light at the tile it is drawn over (currTile). Units do
 		// not get per-corner bilinear - use the averaged gridIdx regardless of the
@@ -1092,14 +1110,15 @@ void Map::drawTerrain(Surface *surface)
 						{
 							int wallShade = getWallShade(O_NORTHWALL, tile);
 							const int wNShade = tile->getObstacle(O_NORTHWALL) ? obstacleShade : wallShade;
+							const bool clipForWestWall = bool(tile->getSprite(O_WESTWALL));
 							if (tintLUT)
 							{
 								const int wallNGridIdx = tile->getAvgGridIdx();
-								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT);
+								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT, clipForWestWall);
 							}
 							else
 							{
-								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, bool(tile->getSprite(O_WESTWALL)), _nvColor);
+								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, clipForWestWall, _nvColor);
 							}
 						}
 						// Draw object

@@ -1006,10 +1006,21 @@ void Surface::blitRawFullBright(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uin
  * @param gridIdx 12-bit packed grid index from Tile::getGridIdx(); 0 = pure black
  * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
  */
-void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT)
+void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, bool half)
 {
 	const int unused = 0;
 	ShaderMove<const Uint8> src(srcSurf, x, y);
+	if (half)
+	{
+		// Mirror blitRaw's half-clip: skip the left half of the source so a
+		// north wall does not overlap a same-tile west wall at their shared
+		// upper-left corner. Without this clip the tinted north wall covers
+		// the rightmost columns of the west wall sprite, producing a visible
+		// "right wall overlapping left wall" seam at concave corners.
+		GraphSubset g = src.getDomain();
+		g.beg_x = g.end_x / 2;
+		src.setDomain(g);
+	}
 	helper::TintShadeParams p = {tintLUT, gridIdx};
 	ShaderDraw<helper::TintShade>(ShaderSurface(destSurf), src, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
 }
