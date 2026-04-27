@@ -813,9 +813,16 @@ void Map::drawTerrain(Surface *surface)
 	// oxceBattleRealisticLighting. When that option is off, tintLUT stays nullptr
 	// and perCorner is forced false, which makes every tinted/per-corner blit
 	// short-circuit to the vanilla blitRaw path - byte-identical to vanilla.
+	// Night vision (the OXCE hybrid system - _nvColor non-zero - and the debug
+	// brightness mode) replaces scene shading with a flat pass over a single palette
+	// row. Applying a colour-tint LUT on top defeats the NV effect entirely. Force
+	// tintLUT off and perCorner off when any NV mode is active so all blits fall
+	// through to the vanilla blitRaw path (which honours _nvColor) and NV behaves
+	// as designed.
+	const bool nvActive = (_nvColor != 0) || (_debugVisionMode == 1);
 	const Uint8 *tintLUT = nullptr;
-	const bool perCorner = Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner;
-	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
+	const bool perCorner = !nvActive && Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner;
+	if (!nvActive && Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
 	{
 		std::string tintPalName = "PAL_BATTLESCAPE";
 		if (_save->getDepth() > 0)
