@@ -158,6 +158,16 @@ public:
 	bool getFullBright() const;
 	/// Sets the fullBright override (called from MCDPatch). v=-1 unset, 0 off, 1 on.
 	void setFullBright(int v) { _fullBright = v; }
+	/// Clears every mod-supplied lighting override on this MapData (modLightSource flag, modLightColor flag, lightOffset, fullBright tri-state). Used by Mod::reloadLightingRules() to wipe the slate before re-applying patches from disk so removed entries actually fall back to vanilla / auto-derived values.
+	void clearModLighting()
+	{
+		_modLightSource = 0;
+		_hasModLightSource = false;
+		_modLightColorR = _modLightColorG = _modLightColorB = 0;
+		_hasModLightColor = false;
+		_lightOffset = Position(0, 0, 0);
+		_fullBright = -1;
+	}
 	/// True iff a mod-supplied lightColour override has been recorded.
 	bool hasModLightColor() const { return _hasModLightColor; }
 	/// Gets the amount of armor.

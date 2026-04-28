@@ -1398,6 +1398,34 @@ void TileEngine::finaliseTintPass()
 			tile->setAccumRGB(aR, aG, aB, LL_AMBIENT, c);
 	}
 
+	// Snapshot the accumulator state at this point - after addLight wrote each
+	// source-layer's contributions and after the ambient overwrite above. Bloom
+	// and stitch below are presentation-only passes that mutate accumulators in
+	// place; we restore the snapshot after quantise so subsequent partial recalcs
+	// (e.g. calculateLighting(LL_UNITS) on a personal-light toggle, which only
+	// resets LL_UNITS) see pristine source values rather than a bloom-spread copy.
+	// Without this, each partial recalc feeds the previous bloom output back into
+	// bloomLighting()'s max-with-decay, ratcheting LL_FIRE/LL_ITEMS coverage
+	// outward by one tile per toggle and never converging.
+	const int totalTiles = _save->getMapSizeXYZ();
+	std::vector<Uint8> snapshotR(totalTiles * LL_MAX * 4);
+	std::vector<Uint8> snapshotG(totalTiles * LL_MAX * 4);
+	std::vector<Uint8> snapshotB(totalTiles * LL_MAX * 4);
+	for (int i = 0; i < totalTiles; ++i)
+	{
+		Tile *t = _save->getTile(i);
+		for (int l = 0; l < LL_MAX; ++l)
+		{
+			for (int c = 0; c < 4; ++c)
+			{
+				const int idx = (i * LL_MAX + l) * 4 + c;
+				snapshotR[idx] = (Uint8)t->getAccumR(l, c);
+				snapshotG[idx] = (Uint8)t->getAccumG(l, c);
+				snapshotB[idx] = (Uint8)t->getAccumB(l, c);
+			}
+		}
+	}
+
 	// Bloom: wall-aware diffusion so ambient bleeds through doorways into interiors
 	// and shadow edges are softened. Must run BEFORE quantise so it sees full-precision
 	// accumulator values.
@@ -1415,9 +1443,25 @@ void TileEngine::finaliseTintPass()
 	}
 
 	// Quantise the full per-corner accumulator into _gridIdx for the renderer.
-	for (int i = 0; i < _save->getMapSizeXYZ(); ++i)
+	for (int i = 0; i < totalTiles; ++i)
 	{
 		_save->getTile(i)->quantiseAccumulator();
+	}
+
+	// Restore the pre-bloom snapshot. _gridIdx already holds the bloomed/stitched
+	// quantised output for the renderer; the accumulators only need to be source-
+	// truth for the next addLight cycle.
+	for (int i = 0; i < totalTiles; ++i)
+	{
+		Tile *t = _save->getTile(i);
+		for (int l = 0; l < LL_MAX; ++l)
+		{
+			for (int c = 0; c < 4; ++c)
+			{
+				const int idx = (i * LL_MAX + l) * 4 + c;
+				t->setAccumRGB(snapshotR[idx], snapshotG[idx], snapshotB[idx], l, c);
+			}
+		}
 	}
 }
 

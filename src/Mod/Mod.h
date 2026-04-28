@@ -401,6 +401,9 @@ private:
 	/// Sorts all our lists according to their weight.
 	void sortLists();
 public:
+	/// Hot-reload: re-parses all .rul files in active mods and re-applies just the lighting-related fields - MCDPatches' lightSource/lightColor/lightOffset/fullBright, RuleItem lightColor/fullBright, and mod-wide personalLightColor / fireLightColor / ambientLightByShade. Resets the mod-supplied track first so removed YAML entries fall back to vanilla / auto-derived values. Auto-derived RGB and non-lighting rule fields are untouched. Does NOT trigger the lighting recalc - caller is expected to invoke TileEngine::recalculateLighting() afterwards. Diagnostic / development use only.
+	void reloadLightingRules();
+
 	static int DOOR_OPEN;
 	static int SLIDING_DOOR_OPEN;
 	static int SLIDING_DOOR_CLOSE;

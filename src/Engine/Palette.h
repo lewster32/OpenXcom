@@ -36,6 +36,8 @@ class Palette
 private:
 	SDL_Color *_colors;
 	int _count;
+	int _firstUsableColor; ///< First palette index that nearestIndex may return (defaults to 1 - skip transparent slot 0).
+	int _lastUsableColor;  ///< Last palette index (inclusive) that nearestIndex may return (defaults to 255). TFTD battlescape palettes set this to 254 to skip the reserved tail slot.
 	std::map<int, Uint8*> _blendLUTs;
 	std::map<int, Uint8*> _tintLUTs; ///< Keyed on mix; each LUT is 256 * 4096 bytes (4-bit per-channel grid).
 public:
@@ -59,6 +61,11 @@ public:
 	void savePalJasc(const std::string &file) const;
 	void setColors(SDL_Color* pal, int ncolors);
 	void setColor(int index, int r, int g, int b);
+	/// Restricts the index range that nearestIndex may return. Use this to keep blend/tint LUTs from picking
+	/// reserved slots (transparent index 0, TFTD's reserved tail at 255, etc). Defaults are (1, 255).
+	void setUsableColorRange(int first, int last) { _firstUsableColor = first; _lastUsableColor = last; }
+	int getFirstUsableColor() const { return _firstUsableColor; }
+	int getLastUsableColor() const { return _lastUsableColor; }
 	void copyColor(int index, int r, int g, int b);
 	/// Returns a 256x256 LUT where lut[src*256+dst] = nearest palette index to (opacity*srcRGB + (100-opacity)*dstRGB)/100. Caches one table per requested opacity.
 	const Uint8 *getBlendLUT(int opacity);

@@ -682,6 +682,15 @@ public:
 	bool hasModLightColor() const { return _hasModLightColor; }
 	/// True iff this item should be rendered fullbright (sprite at max shade, no tint LUT). Default: legacy auto-detect (BT_FLARE -> fullbright); modders override per-item via `fullBright: true/false` in item YAML.
 	bool getFullBright() const;
+	/// Sets the fullBright override directly. v=-1 unset (legacy auto), 0 off, 1 on. Used by hot-reload paths to re-apply YAML state without going through full RuleItem::load().
+	void setFullBright(int v) { _fullBright = v; }
+	/// Clears every mod-supplied lighting override on this RuleItem (modLightColor flag + values, fullBright tri-state). Used by Mod::reloadLightingRules() to wipe the slate before re-applying YAML.
+	void clearModLighting()
+	{
+		_modLightColorR = _modLightColorG = _modLightColorB = 0;
+		_hasModLightColor = false;
+		_fullBright = -1;
+	}
 	/// Gets the item's power used for AoE explosion animation.
 	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?

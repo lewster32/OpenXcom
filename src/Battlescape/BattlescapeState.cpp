@@ -77,6 +77,7 @@
 #include "../Savegame/SavedGame.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
+#include "../Mod/MapDataSet.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/Soldier.h"
 #include "../Savegame/BattleItem.h"
@@ -3126,6 +3127,59 @@ inline void BattlescapeState::handle(Action *action)
 					else if (key == SDLK_F9 && Options::traceAI)
 					{
 						saveAIMap();
+					}
+					// f10 - hot-reload lighting rules from active mods (diagnostic)
+					else if (key == SDLK_F10)
+					{
+						_game->getMod()->reloadLightingRules();
+						_save->getTileEngine()->recalculateLighting();
+						_map->invalidate();
+						debug("Lighting rules reloaded.");
+					}
+					// f8 - dump MCD info for the tile under the cursor (diagnostic).
+					// Prints dataset name + MCDIndex + lightSource/lightColor/fullBright per tile-part
+					// to the runtime log, plus a one-line summary on the debug overlay. Lets you
+					// pick a glowing prop in-game and see the exact `type:` / `MCDIndex:` you need
+					// for an MCDPatches entry without having to grep the MCD files.
+					else if (key == SDLK_F8 && !altPressed)
+					{
+						Position cursorPos;
+						_map->getSelectorPosition(&cursorPos);
+						Tile *cursorTile = _save->getTile(cursorPos);
+						if (!cursorTile)
+						{
+							debug("F8: no tile under cursor");
+						}
+						else
+						{
+							const char* partNames[O_MAX] = { "FLOOR    ", "WESTWALL ", "NORTHWALL", "OBJECT   " };
+							std::ostringstream summary;
+							summary << "F8 (" << cursorPos.x << "," << cursorPos.y << "," << cursorPos.z << ")";
+							Log(LOG_INFO) << "[F8 cursor inspect] tile (" << cursorPos.x << "," << cursorPos.y << "," << cursorPos.z << ")";
+							for (int p = 0; p < O_MAX; ++p)
+							{
+								MapData *md = cursorTile->getMapData((TilePart)p);
+								if (!md) continue;
+								int mapDataID = -1, mapDataSetID = -1;
+								cursorTile->getMapData(&mapDataID, &mapDataSetID, (TilePart)p);
+								std::string dsName = "?";
+								if (mapDataSetID >= 0 && (size_t)mapDataSetID < _save->getMapDataSets()->size())
+								{
+									dsName = _save->getMapDataSets()->at(mapDataSetID)->getName();
+								}
+								int lr, lg, lb; md->getLightColor(lr, lg, lb);
+								int ls = md->getLightSource();
+								char colorHex[8]; std::snprintf(colorHex, sizeof colorHex, "#%02x%02x%02x", lr, lg, lb);
+								std::ostringstream line;
+								line << partNames[p] << ": " << dsName << " #" << mapDataID
+									 << " (lightSource=" << ls
+									 << ", lightColor=" << colorHex
+									 << ", fullBright=" << (md->getFullBright() ? "true" : "false") << ")";
+								Log(LOG_INFO) << "  " << line.str();
+								summary << " | " << dsName << "#" << mapDataID;
+							}
+							debug(summary.str());
+						}
 					}
 				}
 				// quick save and quick load

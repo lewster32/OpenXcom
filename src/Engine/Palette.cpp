@@ -36,11 +36,14 @@ static inline int sqrDist(const SDL_Color &a, const SDL_Color &b)
 	return dr * dr + dg * dg + db * db;
 }
 
-static Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target)
+// Iterates only [firstColor, lastColor] inclusive. Reserved slots (transparent index 0,
+// TFTD's reserved tail) must stay outside the search or near-black/near-tail tint targets
+// would map to them, producing transparent or wrong-colour pixels in tinted blits.
+static Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target, int firstColor, int lastColor)
 {
-	int best = 0;
-	int bestDist = sqrDist(colors[0], target);
-	for (int i = 1; i < 256; ++i)
+	int best = firstColor;
+	int bestDist = sqrDist(colors[firstColor], target);
+	for (int i = firstColor + 1; i <= lastColor; ++i)
 	{
 		int d = sqrDist(colors[i], target);
 		if (d < bestDist)
@@ -60,7 +63,10 @@ namespace OpenXcom
 /**
  * Initializes a brand new palette.
  */
-Palette::Palette() : _colors(0), _count(0)
+// Defaults skip the transparent slot 0 (a global X-COM palette convention), but
+// keep the full tail. TFTD battlescape palettes narrow the upper bound to 254
+// because index 255 is reserved; that override is applied at LBM-load time.
+Palette::Palette() : _colors(0), _count(0), _firstUsableColor(1), _lastUsableColor(255)
 {
 }
 
@@ -266,7 +272,7 @@ const Uint8 *Palette::getBlendLUT(int opacity)
 			blended.r = (Uint8)((_colors[src].r * opacity + _colors[dst].r * (100 - opacity)) / 100);
 			blended.g = (Uint8)((_colors[src].g * opacity + _colors[dst].g * (100 - opacity)) / 100);
 			blended.b = (Uint8)((_colors[src].b * opacity + _colors[dst].b * (100 - opacity)) / 100);
-			lut[src * 256 + dst] = nearestIndex(_colors, blended);
+			lut[src * 256 + dst] = nearestIndex(_colors, blended, _firstUsableColor, _lastUsableColor);
 		}
 	}
 	_blendLUTs[opacity] = lut;
@@ -321,7 +327,7 @@ const Uint8 *Palette::getTintLUT(int mix)
 			target.g = (Uint8)(_colors[src].g * effG / 255);
 			target.b = (Uint8)(_colors[src].b * effB / 255);
 
-			lut[src * cells + cell] = nearestIndex(_colors, target);
+			lut[src * cells + cell] = nearestIndex(_colors, target, _firstUsableColor, _lastUsableColor);
 		}
 	}
 	_tintLUTs[mix] = lut;

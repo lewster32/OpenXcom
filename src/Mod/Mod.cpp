@@ -5934,6 +5934,11 @@ void Mod::loadBattlescapeResources()
 		SDL_Color *colors = tempSurface->getPalette();
 		colors[255] = backPal[i];
 		_palettes[pals[i]]->setColors(colors, 256);
+		// TFTD reserves index 255 of every battlescape palette as a UI / scene-tail
+		// slot; nearestIndex must not pick it for tinted/blended outputs or near-white
+		// targets snap to the reserved slot and render as garbage. Index 0 is the
+		// engine-wide transparent slot and stays excluded by the default firstUsable=1.
+		_palettes[pals[i]]->setUsableColorRange(1, 254);
 		createTransparencyLUT(_palettes[pals[i]]);
 		delete tempSurface;
 	}
@@ -6947,6 +6952,181 @@ void Mod::autoDeriveLightColors()
 				md->setLightColor(r, g, b);
 		}
 	}
+}
+
+/**
+ * Hot-reload lighting fields from disk for the active mod stack. Walks every .rul file
+ * (in the same mod-priority order as loadAll) and re-parses just the lighting-related
+ * sections - top-level personalLightColor / fireLightColor / ambientLightByShade,
+ * MCDPatches' lightSource / lightColor / lightOffset / fullBright, and per-item
+ * lightColor / fullBright. The mod-supplied track is reset on every MapData and
+ * RuleItem first so YAML entries the modder removed since startup actually fall back
+ * to vanilla / auto-derived values rather than persisting from memory.
+ *
+ * Auto-derived RGB and non-lighting rule fields are untouched. Per-file exceptions are
+ * caught and logged so a YAML typo in one rul does not abort the whole reload. Caller is
+ * responsible for triggering TileEngine::recalculateLighting() afterwards.
+ */
+void Mod::reloadLightingRules()
+{
+	Log(LOG_INFO) << "[reloadLightingRules] starting hot-reload of lighting fields";
+
+	// Step A: reset mod-supplied lighting overrides on every existing MapData and RuleItem.
+	int mapDataCount = 0;
+	for (auto& dsPair : _mapDataSets)
+	{
+		MapDataSet *ds = dsPair.second;
+		auto *objs = ds->getObjectsRaw();
+		if (!objs) continue;
+		for (MapData *md : *objs)
+		{
+			if (md)
+			{
+				md->clearModLighting();
+				++mapDataCount;
+			}
+		}
+	}
+	for (auto& itemPair : _items)
+	{
+		itemPair.second->clearModLighting();
+	}
+
+	// Step B: reset mod-wide lighting fields to constructor defaults so removed YAML
+	// entries fall back correctly. Mirrors the initialisation in Mod::Mod().
+	for (int s = 0; s < 16; ++s)
+	{
+		int v = 255 - s * 17; if (v < 0) v = 0;
+		_ambientColorsByShade[s][0] = v;
+		_ambientColorsByShade[s][1] = v;
+		_ambientColorsByShade[s][2] = v;
+	}
+	_personalLightColor[0] = 128; _personalLightColor[1] = 128; _personalLightColor[2] = 128;
+	_fireLightColor[0]     = 255; _fireLightColor[1]     = 128; _fireLightColor[2]     = 0;
+
+	// Step C: walk every .rul file and re-apply lighting fields.
+	int filesProcessed = 0;
+	int filesFailed = 0;
+	int mcdPatchEntries = 0;
+	int itemEntries = 0;
+	int ambientReloads = 0;
+	int personalReloads = 0;
+	int fireReloads = 0;
+
+	const auto& mods = FileMap::getRulesets();
+	for (const auto& modPair : mods)
+	{
+		// Mirror loadMod's sort: highest path first (so later-priority overrides win as last-applied).
+		std::vector<FileMap::FileRecord> sortedFiles = modPair.second;
+		std::sort(sortedFiles.begin(), sortedFiles.end(),
+			[](const FileMap::FileRecord& a, const FileMap::FileRecord& b)
+			{ return a.fullpath > b.fullpath; });
+
+		for (const auto& filerec : sortedFiles)
+		{
+			try
+			{
+				YAML::YamlRootNodeReader root = filerec.getYAML();
+				YAML::YamlNodeReader reader = root.useIndex();
+
+				// Mod-wide lighting tables.
+				if (const auto& ambientNode = reader["ambientLightByShade"])
+				{
+					parseAmbientLightByShade(ambientNode, _ambientColorsByShade);
+					++ambientReloads;
+				}
+				if (const auto& personalNode = reader["personalLightColor"])
+				{
+					Palette::readColor(personalNode, _personalLightColor[0], _personalLightColor[1], _personalLightColor[2]);
+					++personalReloads;
+				}
+				if (const auto& fireNode = reader["fireLightColor"])
+				{
+					Palette::readColor(fireNode, _fireLightColor[0], _fireLightColor[1], _fireLightColor[2]);
+					++fireReloads;
+				}
+
+				// MCDPatches: re-build a transient MCDPatch per entry and apply to the live MapDataSet.
+				// We do not store the temporary patch anywhere - the lasting state lives on MapData.
+				// Each patch is wrapped in its own try/catch so a single out-of-bounds MCDIndex
+				// (which throws from MapDataSet::getObject) only loses its own entry rather than
+				// aborting the whole file - critical for hot-reload usability when modders are
+				// iterating on indices and might temporarily reference an invalid one.
+				if (const auto& patchesNode = reader["MCDPatches"])
+				{
+					for (const auto& patchEntry : patchesNode.children())
+					{
+						std::string type;
+						patchEntry.tryRead("type", type);
+						if (type.empty()) continue;
+						auto dsIt = _mapDataSets.find(type);
+						if (dsIt == _mapDataSets.end()) continue;
+
+						try
+						{
+							MCDPatch tempPatch;
+							tempPatch.load(patchEntry);
+							tempPatch.modifyData(dsIt->second);
+							++mcdPatchEntries;
+						}
+						catch (Exception &e)
+						{
+							Log(LOG_WARNING) << "[reloadLightingRules] " << filerec.fullpath
+								<< " MCDPatches[" << type << "]: " << e.what()
+								<< " (patch skipped, remaining entries continue)";
+						}
+					}
+				}
+
+				// items: re-parse just lightColor and fullBright on existing rules.
+				if (const auto& itemsNode = reader["items"])
+				{
+					for (const auto& itemEntry : itemsNode.children())
+					{
+						std::string type;
+						itemEntry.tryRead("type", type);
+						if (type.empty()) continue;
+						auto itIt = _items.find(type);
+						if (itIt == _items.end()) continue;
+						RuleItem *rule = itIt->second;
+
+						bool touched = false;
+						if (const auto& lc = itemEntry["lightColor"])
+						{
+							int r, g, b;
+							Palette::readColor(lc, r, g, b);
+							rule->setModLightColor(r, g, b);
+							touched = true;
+						}
+						if (const auto& fb = itemEntry["fullBright"])
+						{
+							rule->setFullBright(fb.readVal<bool>() ? 1 : 0);
+							touched = true;
+						}
+						if (touched) ++itemEntries;
+					}
+				}
+
+				++filesProcessed;
+			}
+			catch (Exception &e)
+			{
+				Log(LOG_ERROR) << "[reloadLightingRules] " << filerec.fullpath << ": " << e.what();
+				++filesFailed;
+			}
+			catch (YAML::Exception &e)
+			{
+				Log(LOG_ERROR) << "[reloadLightingRules] " << filerec.fullpath << ": " << e.what();
+				++filesFailed;
+			}
+		}
+	}
+
+	Log(LOG_INFO) << "[reloadLightingRules] done. files: " << filesProcessed
+		<< " (failed " << filesFailed << "), MCDPatch entries: " << mcdPatchEntries
+		<< ", item entries: " << itemEntries
+		<< ", reset map data: " << mapDataCount
+		<< ", ambient/personal/fire reloads: " << ambientReloads << "/" << personalReloads << "/" << fireReloads;
 }
 
 
