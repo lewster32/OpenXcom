@@ -673,32 +673,7 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 
 	if (const auto& lightNode = reader["light"])
 	{
-		if (lightNode["color"])
-		{
-			int r, g, b;
-			Palette::readColor(lightNode["color"], r, g, b);
-			setModLightColor(r, g, b);
-		}
-		if (lightNode["radius"])
-		{
-			int radius = lightNode["radius"].readVal<int>();
-			if (radius < 1) radius = 1;
-			if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
-			_lightRadius = radius;
-			_hasLightRadius = true;
-		}
-		if (lightNode["intensity"])
-		{
-			double intensity = lightNode["intensity"].readVal<double>();
-			if (intensity < 0.0) intensity = 0.0;
-			if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
-			_lightIntensity = intensity;
-			_hasLightIntensity = true;
-		}
-		if (lightNode["fullBright"])
-		{
-			_fullBright = lightNode["fullBright"].readVal<bool>() ? 1 : 0;
-		}
+		loadLightBlock(lightNode);
 	}
 
 	mod->loadSpriteOffset(_type, _customItemPreviewIndex, reader["customItemPreviewIndex"], "CustomItemPreviews");
@@ -1438,6 +1413,42 @@ double RuleItem::getEffectiveLightIntensity(int fallbackRange) const
 	if (_hasLightIntensity) return _lightIntensity;
 	if (fallbackRange <= 0) return 0.0;
 	return fallbackRange / 15.0;
+}
+
+/**
+ * Parses a nested `light:` block (color / radius / intensity / fullBright) from YAML
+ * and writes the four fields. Called from RuleItem::load() during initial parsing
+ * and from Mod::reloadLightingRules() during hot-reload, so the two paths cannot
+ * diverge.
+ */
+void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
+{
+	if (lightNode["color"])
+	{
+		int r, g, b;
+		Palette::readColor(lightNode["color"], r, g, b);
+		setModLightColor(r, g, b);
+	}
+	if (lightNode["radius"])
+	{
+		int radius = lightNode["radius"].readVal<int>();
+		if (radius < 1) radius = 1;
+		if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
+		_lightRadius = radius;
+		_hasLightRadius = true;
+	}
+	if (lightNode["intensity"])
+	{
+		double intensity = lightNode["intensity"].readVal<double>();
+		if (intensity < 0.0) intensity = 0.0;
+		if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
+		_lightIntensity = intensity;
+		_hasLightIntensity = true;
+	}
+	if (lightNode["fullBright"])
+	{
+		_fullBright = lightNode["fullBright"].readVal<bool>() ? 1 : 0;
+	}
 }
 
 /**

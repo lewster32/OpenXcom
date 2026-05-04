@@ -7078,7 +7078,9 @@ void Mod::reloadLightingRules()
 					}
 				}
 
-				// items: re-parse just lightColor and fullBright on existing rules.
+				// items: re-parse the nested light: block on existing rules.
+				// The main parser at RuleItem::load() and this hot-reload path both delegate
+				// to RuleItem::loadLightBlock so they cannot diverge.
 				if (const auto& itemsNode = reader["items"])
 				{
 					for (const auto& itemEntry : itemsNode.children())
@@ -7090,20 +7092,11 @@ void Mod::reloadLightingRules()
 						if (itIt == _items.end()) continue;
 						RuleItem *rule = itIt->second;
 
-						bool touched = false;
-						if (const auto& lc = itemEntry["lightColor"])
+						if (const auto& lightNode = itemEntry["light"])
 						{
-							int r, g, b;
-							Palette::readColor(lc, r, g, b);
-							rule->setModLightColor(r, g, b);
-							touched = true;
+							rule->loadLightBlock(lightNode);
+							++itemEntries;
 						}
-						if (const auto& fb = itemEntry["fullBright"])
-						{
-							rule->setFullBright(fb.readVal<bool>() ? 1 : 0);
-							touched = true;
-						}
-						if (touched) ++itemEntries;
 					}
 				}
 

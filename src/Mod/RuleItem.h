@@ -712,6 +712,11 @@ public:
 	/// typically the per-BattleItem getGlowRange() since RuleItem itself has no
 	/// inherent radius).
 	double getEffectiveLightIntensity(int fallbackRange) const;
+	/// Parses a nested `light:` block (color / radius / intensity / fullBright) from YAML
+	/// and applies the values to this rule. Shared between the main load path and
+	/// Mod::reloadLightingRules so the hot-reload path cannot diverge from the static
+	/// load path for nested-block fields.
+	void loadLightBlock(const YAML::YamlNodeReader& lightNode);
 	/// Gets the item's power used for AoE explosion animation.
 	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?
