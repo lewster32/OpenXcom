@@ -187,6 +187,8 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_lightColorR(255), _lightColorG(255), _lightColorB(255),
 	_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
 	_fullBright(-1),
+	_lightRadius(0), _hasLightRadius(false),
+	_lightIntensity(0.0), _hasLightIntensity(false),
 	_kneelBonus(-1), _oneHandedPenalty(-1),
 	_monthlySalary(0), _monthlyMaintenance(0),
 	_sprayWaypoints(0)
@@ -1396,6 +1398,19 @@ bool RuleItem::getFullBright() const
 	if (_fullBright == -1)
 		return _battleType == BT_FLARE;
 	return _fullBright != 0;
+}
+
+/**
+ * Returns the centre brightness for the BattleItem-driven addLight call. Mod
+ * override wins; otherwise the legacy-equivalent fallbackRange / 15.0 (which
+ * matches the centre brightness produced by today's linear falloff at the
+ * source tile).
+ */
+double RuleItem::getEffectiveLightIntensity(int fallbackRange) const
+{
+	if (_hasLightIntensity) return _lightIntensity;
+	if (fallbackRange <= 0) return 0.0;
+	return fallbackRange / 15.0;
 }
 
 /**

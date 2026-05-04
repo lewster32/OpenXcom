@@ -480,6 +480,10 @@ private:
 	bool _hasModLightColor;
 	// Tri-state: -1 unset (legacy auto: BT_FLARE -> fullbright), 0 forced off, 1 forced on.
 	int _fullBright;
+	int _lightRadius;
+	bool _hasLightRadius;
+	double _lightIntensity;
+	bool _hasLightIntensity;
 	std::vector<int> _customItemPreviewIndex;
 	int _kneelBonus, _oneHandedPenalty;
 	int _monthlySalary, _monthlyMaintenance;
@@ -690,7 +694,24 @@ public:
 		_modLightColorR = _modLightColorG = _modLightColorB = 0;
 		_hasModLightColor = false;
 		_fullBright = -1;
+		_hasLightRadius = false;
+		_lightRadius = 0;
+		_hasLightIntensity = false;
+		_lightIntensity = 0.0;
 	}
+	/// True iff this RuleItem set an explicit light radius override.
+	bool hasLightRadius() const { return _hasLightRadius; }
+	/// Explicit mod-supplied radius. Caller must check hasLightRadius() first.
+	int getLightRadius() const { return _lightRadius; }
+	/// True iff this RuleItem set an explicit light intensity override.
+	bool hasLightIntensity() const { return _hasLightIntensity; }
+	/// Explicit mod-supplied intensity. Caller must check hasLightIntensity() first.
+	double getLightIntensity() const { return _lightIntensity; }
+	/// Effective intensity for the addLight call. Returns the mod override if set,
+	/// otherwise the legacy-equivalent fallbackRange / 15.0 (where fallbackRange is
+	/// typically the per-BattleItem getGlowRange() since RuleItem itself has no
+	/// inherent radius).
+	double getEffectiveLightIntensity(int fallbackRange) const;
 	/// Gets the item's power used for AoE explosion animation.
 	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?
