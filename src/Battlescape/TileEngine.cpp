@@ -45,6 +45,34 @@
 #include "MeleeAttackBState.h"
 #include "../fmath.h"
 
+namespace
+{
+// Inverse-square clamped falloff curve sharpness. See
+// docs/superpowers/specs/2026-05-04-light-radius-intensity-design.md.
+// Single tunable global. Smaller values are flatter (more linear);
+// larger values concentrate brightness at the centre.
+constexpr double LIGHT_FALLOFF_K = 0.05;
+
+// Hardcoded centre-brightness for light types that do not expose
+// modder-tunable per-source intensity fields.
+constexpr double FIRE_LIGHT_INTENSITY     = 1.0;
+constexpr double PERSONAL_LIGHT_INTENSITY = 1.0;
+
+// Inverse-square clamped falloff:
+//   raw(x)         = 1 / (1 + k * x^2)
+//   falloff(d, r)  = max(0, (raw(d) - raw(r)) / (1 - raw(r)))
+// Yields exactly 1.0 at d=0 and 0.0 at d=r, with a smooth tail.
+inline double computeFalloff(int distance, int radius)
+{
+    if (radius <= 0 || distance >= radius) return 0.0;
+    const double d2 = static_cast<double>(distance) * distance;
+    const double r2 = static_cast<double>(radius)   * radius;
+    const double rawD = 1.0 / (1.0 + LIGHT_FALLOFF_K * d2);
+    const double rawR = 1.0 / (1.0 + LIGHT_FALLOFF_K * r2);
+    return (rawD - rawR) / (1.0 - rawR);
+}
+}
+
 namespace OpenXcom
 {
 namespace
