@@ -60,15 +60,6 @@ constexpr double LIGHT_FALLOFF_K = 0.05;
 constexpr double FIRE_LIGHT_INTENSITY = 1.0;
 constexpr double PERSONAL_LIGHT_INTENSITY = 1.0;
 
-// Perceptual gamma applied to the gameplay scalar (and only the scalar - RGB
-// tile colour tint stays on the linear inverse-square curve). The eye responds
-// to sqrt(luminance), so 0.5 is the physically-justified default and matches
-// legacy linear-era unit visibility at mid-range. Lower values brighten mid-
-// to-edge unit shading further: 0.33 (cube root) is noticeably softer, 0.25
-// (fourth root) flatter still. 1.0 disables the softening entirely (unit shade
-// follows the same sharp curve as RGB).
-constexpr double LIGHT_SCALAR_GAMMA = 0.5;
-
 // Inverse-square clamped falloff:
 //   raw(x)         = 1 / (1 + k * x^2)
 //   falloff(d, r)  = max(0, (raw(d) - raw(r)) / (1 - raw(r)))
@@ -1787,12 +1778,11 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			const auto targetLight = tile->getLightMulti(layer);
 			const double falloff = computeFalloff(distance, radius);
 			const double effective = intensity * falloff;
-			// Scalar uses pow(effective, LIGHT_SCALAR_GAMMA) so unit-sprite shading
-			// falls off perceptually with distance while RGB tile colour follows the
-			// sharper inverse-square curve. Tune LIGHT_SCALAR_GAMMA at the top of the
-			// file to brighten or dim units relative to their tile surroundings.
-			const double scalarFactor = effective > 0.0 ? std::pow(effective, LIGHT_SCALAR_GAMMA) : 0.0;
-			auto currLight = std::min(15, (int)std::round(scalarFactor * 15.0));
+			// Linear scalar - tiles, items, and corpses dim with distance like physical
+			// light. Units get a perceptual softening at draw time (Map::drawUnit) via
+			// LightingHash::SCALAR_GAMMA, so they stay visible far from a light source's
+			// centre without flattening item or tile shading on the same tile.
+			auto currLight = std::min(15, (int)std::round(effective * 15.0));
 
 			if (clasicLighting)
 			{

@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <cmath>
 #include <sstream>
 #include "Map.h"
 #include "Camera.h"
@@ -23,6 +24,7 @@
 #include "ItemSprite.h"
 #include "Pathfinding.h"
 #include "TileEngine.h"
+#include "LightingHash.h"
 #include "Projectile.h"
 #include "Explosion.h"
 #include "BattlescapeState.h"
@@ -723,6 +725,17 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 		{
 			shade = getShadePulseForFrame(shade, _animFrame);
 		}
+	}
+	// Apply the perceptual gamma softening to the unit's shade only - tiles and
+	// items continue to render at the linear scalar so corpses, dropped items,
+	// and tile surfaces dim correctly with distance. The same tile that renders
+	// a corpse at shade 12 (dim) will render a unit standing on it at shade ~3
+	// at SCALAR_GAMMA = 0.1, which is the tactical-visibility-friendly default.
+	if (shade > 0 && shade < 15)
+	{
+		const double rawLight = (15.0 - shade) / 15.0;
+		const double softLight = std::pow(rawLight, LightingHash::SCALAR_GAMMA);
+		shade = std::max(0, 15 - (int)std::round(softLight * 15.0));
 	}
 	if (_debugVisionMode == 1)
 	{

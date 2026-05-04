@@ -24,6 +24,16 @@ namespace OpenXcom
 namespace LightingHash
 {
 
+// Perceptual gamma applied to the tile shade ONLY when rendering a living
+// unit sprite (Map::drawUnit). Tiles and items render at the linear scalar
+// (so corpses, dropped weapons, and tile/object surfaces dim correctly with
+// distance like physical light), but units get this softer curve so they
+// stay visible far from a light source's centre. Lower values brighten
+// units further: 1.0 = no softening, 0.5 = sqrt (perceptually justified),
+// 0.25 = fourth root, 0.1 = near-uniform unit shading across the lit area
+// (current in-game-tuned default for tactical visibility).
+constexpr double SCALAR_GAMMA = 0.1;
+
 // Boost-style hash combiner. Same inputs always yield the same output;
 // outputs are uniformly distributed across the 32-bit range for the
 // small-integer inputs we feed in (tile coords + part index, or a
