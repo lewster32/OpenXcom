@@ -1778,7 +1778,13 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			const auto targetLight = tile->getLightMulti(layer);
 			const double falloff = computeFalloff(distance, radius);
 			const double effective = intensity * falloff;
-			auto currLight = std::min(15, (int)std::round(effective * 15.0));
+			// Scalar uses sqrt of effective so that unit-sprite shading falls off
+			// perceptually linearly with distance, even though RGB tile colour follows
+			// the sharper inverse-square curve. The eye responds to sqrt(luminance),
+			// so this keeps units visible away from a light source's centre without
+			// flattening the atmospheric colour falloff that drives tile tinting.
+			const double scalarFactor = effective > 0.0 ? std::sqrt(effective) : 0.0;
+			auto currLight = std::min(15, (int)std::round(scalarFactor * 15.0));
 
 			if (clasicLighting)
 			{
