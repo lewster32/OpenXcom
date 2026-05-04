@@ -1246,7 +1246,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-					addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS);
+				addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS);
 			}
 		}
 	}
