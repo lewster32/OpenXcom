@@ -1095,7 +1095,7 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			{
 				currLight = getMaxStaticLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, LL_FIRE, winR, winG, winB, false, winOffset);
+			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_FIRE, winR, winG, winB, false, winOffset);
 		}
 	);
 }
@@ -1138,7 +1138,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, LL_ITEMS, winR, winG, winB);
+			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_ITEMS, winR, winG, winB);
 		}
 	);
 }
@@ -1235,7 +1235,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-				addLight(gs, pos + Position(x, y, 0), currLight, LL_UNITS, winR, winG, winB, winBypassLOS);
+				addLight(gs, pos + Position(x, y, 0), currLight, currLight / 15.0, LL_UNITS, winR, winG, winB, winBypassLOS);
 			}
 		}
 	}
@@ -1714,11 +1714,11 @@ void TileEngine::recalculateLighting()
  * @param power Power.
  * @param layer Light is separated in 4 layers: Ambient, Tiles, Items, Units.
  */
-void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers layer,
+void TileEngine::addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
                           int lightR, int lightG, int lightB,
                           bool bypassLOS, Position lightOffset)
 {
-	if (power <= 0)
+	if (radius <= 0 || intensity <= 0.0)
 	{
 		return;
 	}
@@ -1743,7 +1743,7 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 	const auto topTargetVoxel = static_cast<Sint16>(_save->getMapSizeZ() * accuracy.z - 1);
 	const auto topCenterVoxel = static_cast<Sint16>((getBlockUp(_blockVisibility[_save->getTileIndex(center)]) ? (center.z + 1) : _save->getMapSizeZ()) * accuracy.z - 1);
 	const auto maxFirePower = std::min(15, getMaxStaticLightDistance() - 1);
-	const auto gsInter = MapSubset::intersection(gs, mapArea(center, power - 1));
+	const auto gsInter = MapSubset::intersection(gs, mapArea(center, radius - 1));
 
 	iterateTiles(
 		_save,
@@ -1754,7 +1754,9 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			const auto diff = target - center;
 			const auto distance = (int)Round(Position::distance(target.toVoxel(), center.toVoxel()) / Position::TileXY);
 			const auto targetLight = tile->getLightMulti(layer);
-			auto currLight = power - distance;
+			const double falloff = computeFalloff(distance, radius);
+			const double effective = intensity * falloff;
+			auto currLight = std::min(15, (int)std::round(effective * 15.0));
 
 			if (clasicLighting)
 			{
@@ -1763,9 +1765,9 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 				// semantics (a brighter source still suppresses dimmer scalar updates).
 				if (currLight > 0)
 				{
-					const int cR = lightR * currLight / 15;
-					const int cG = lightG * currLight / 15;
-					const int cB = lightB * currLight / 15;
+					const int cR = std::min(255, (int)std::round(lightR * effective));
+					const int cG = std::min(255, (int)std::round(lightG * effective));
+					const int cB = std::min(255, (int)std::round(lightB * effective));
 					for (int c = 0; c < 4; ++c)
 						tile->addLightRGB(cR, cG, cB, layer, c);
 				}
@@ -1883,9 +1885,10 @@ void TileEngine::addLight(MapSubset gs, Position center, int power, LightLayers 
 			// max-wins semantics below.
 			if (currLight > 0)
 			{
-				const int cR = lightR * currLight / 15;
-				const int cG = lightG * currLight / 15;
-				const int cB = lightB * currLight / 15;
+				const double effectiveAfterLos = currLight / 15.0;
+				const int cR = std::min(255, (int)std::round(lightR * effectiveAfterLos));
+				const int cG = std::min(255, (int)std::round(lightG * effectiveAfterLos));
+				const int cB = std::min(255, (int)std::round(lightB * effectiveAfterLos));
 				for (int c = 0; c < 4; ++c)
 					tile->addLightRGB(cR, cG, cB, layer, c);
 			}

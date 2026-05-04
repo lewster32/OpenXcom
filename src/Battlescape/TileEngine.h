@@ -131,7 +131,7 @@ private:
 
 	/// Add light source with optional per-source RGB tint, LOS-bypass flag and voxel-space emitter offset.
 	/// Defaults preserve vanilla behaviour (white light, LOS-respecting, no offset).
-	void addLight(MapSubset gs, Position center, int power, LightLayers layer,
+	void addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
 	              int lightR = 255, int lightG = 255, int lightB = 255,
 	              bool bypassLOS = false, Position lightOffset = Position(0, 0, 0));
 	/// Calculate blockage amount.
