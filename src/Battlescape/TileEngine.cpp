@@ -1095,6 +1095,7 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			{
 				currLight = getMaxStaticLightDistance() - 1;
 			}
+			// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
 			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_FIRE, winR, winG, winB, false, winOffset);
 		}
 	);
@@ -1138,6 +1139,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
+			// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
 			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_ITEMS, winR, winG, winB);
 		}
 	);
@@ -1235,6 +1237,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
+				// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
 				addLight(gs, pos + Position(x, y, 0), currLight, currLight / 15.0, LL_UNITS, winR, winG, winB, winBypassLOS);
 			}
 		}
@@ -1709,10 +1712,20 @@ void TileEngine::recalculateLighting()
 }
 
 /**
- * Adds circular light pattern starting from center and losing power with distance travelled.
- * @param center Center.
- * @param power Power.
- * @param layer Light is separated in 4 layers: Ambient, Tiles, Items, Units.
+ * Adds a light contribution radiating from `center` to every tile within
+ * `radius`, attenuated by the inverse-square clamped curve in computeFalloff()
+ * and modulated by `intensity` (centre brightness). intensity > 1.0 produces
+ * channel-saturating blow-out.
+ * @param gs           Map area subset to update.
+ * @param center       Tile position the light radiates from.
+ * @param radius       Throw distance in tiles. radius <= 0 short-circuits.
+ * @param intensity    Centre brightness in [0.0, 5.0]. Capped at the spec's
+ *                     blow-out range; 0.0 short-circuits.
+ * @param layer        One of LL_AMBIENT, LL_FIRE, LL_ITEMS, LL_UNITS.
+ * @param lightR/G/B   Light source colour in 0-255 per channel.
+ * @param bypassLOS    If true and oxceBattleRealisticLighting is off, light
+ *                     wraps around walls (vanilla flashlight behaviour).
+ * @param lightOffset  Optional sub-tile offset of the source position.
  */
 void TileEngine::addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
                           int lightR, int lightG, int lightB,
@@ -1798,6 +1811,9 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			Position lastTileB = center;
 			auto stepsA = 0;
 			auto stepsB = 0;
+			// Snapshot the pre-LOS scalar so the post-LOS RGB write can compute the
+			// attenuation fraction and apply it to the pre-LOS effective double.
+			const auto currLightBeforeLos = currLight;
 			// Named losPowerA/losPowerB (not lightA/lightB) to avoid shadowing the
 			// `lightB` parameter (blue channel of the light colour) in this scope.
 			auto losPowerA = currLight;
@@ -1885,7 +1901,14 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			// max-wins semantics below.
 			if (currLight > 0)
 			{
-				const double effectiveAfterLos = currLight / 15.0;
+				// Carry the pre-LOS effective double (which can exceed 1.0 for blow-out)
+				// through, applying LOS attenuation as a proportional fraction. This
+				// preserves blow-out under smoke/wall attenuation while keeping the
+				// integer scalar track byte-identical to the legacy behaviour.
+				const double losFraction = (currLightBeforeLos > 0)
+					? static_cast<double>(currLight) / currLightBeforeLos
+					: 0.0;
+				const double effectiveAfterLos = effective * losFraction;
 				const int cR = std::min(255, (int)std::round(lightR * effectiveAfterLos));
 				const int cG = std::min(255, (int)std::round(lightG * effectiveAfterLos));
 				const int cB = std::min(255, (int)std::round(lightB * effectiveAfterLos));
