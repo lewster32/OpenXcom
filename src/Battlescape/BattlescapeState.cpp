@@ -3128,7 +3128,8 @@ inline void BattlescapeState::handle(Action *action)
 					{
 						saveAIMap();
 					}
-					// f10 - hot-reload lighting rules from active mods (diagnostic)
+					// REMOVE_BEFORE_RELEASE: F10 = hot-reload lighting rules + force lighting recalc.
+					// Coloured-lighting development aid only; ship-blocked. Grep REMOVE_BEFORE_RELEASE before tagging a release.
 					else if (key == SDLK_F10)
 					{
 						_game->getMod()->reloadLightingRules();
@@ -3136,7 +3137,10 @@ inline void BattlescapeState::handle(Action *action)
 						_map->invalidate();
 						debug("Lighting rules reloaded.");
 					}
-					// f8 - dump MCD info for the tile under the cursor (diagnostic).
+					// END REMOVE_BEFORE_RELEASE (F10)
+
+					// REMOVE_BEFORE_RELEASE: F8 = dump MCD info for the tile under the cursor.
+					// Coloured-lighting development aid only; ship-blocked. Grep REMOVE_BEFORE_RELEASE before tagging a release.
 					// Prints dataset name + MCDIndex + lightSource/lightColor/fullBright per tile-part
 					// to the runtime log, plus a one-line summary on the debug overlay. Lets you
 					// pick a glowing prop in-game and see the exact `type:` / `MCDIndex:` you need
@@ -3181,6 +3185,7 @@ inline void BattlescapeState::handle(Action *action)
 							debug(summary.str());
 						}
 					}
+					// END REMOVE_BEFORE_RELEASE (F8)
 				}
 				// quick save and quick load
 				if (!_game->getSavedGame()->isIronman() && !_save->isPreview())
