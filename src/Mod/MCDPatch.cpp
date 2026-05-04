@@ -136,29 +136,51 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 		}
 		if (mcd["lightSource"])
 		{
+			// Vanilla and existing-mod back-compat alias for light.source.
 			int lightSource = mcd["lightSource"].readVal<int>();
 			_lightSources.push_back(std::make_pair(MCDIndex, lightSource));
 		}
-		if (mcd["lightOffset"])
+		if (mcd["light"])
 		{
-			std::vector<int> offset = mcd["lightOffset"].readVal<std::vector<int> >();
-			if (offset.size() == 3)
-				_lightOffsets.push_back(std::make_pair(MCDIndex, offset));
-		}
-		if (mcd["lightColor"])
-		{
-			int r, g, b;
-			Palette::readColor(mcd["lightColor"], r, g, b);
-			std::vector<int> rgb;
-			rgb.push_back(r);
-			rgb.push_back(g);
-			rgb.push_back(b);
-			_lightColors.push_back(std::make_pair(MCDIndex, rgb));
-		}
-		if (mcd["fullBright"])
-		{
-			bool fullBright = mcd["fullBright"].readVal<bool>();
-			_fullBrights.push_back(std::make_pair(MCDIndex, fullBright ? 1 : 0));
+			const auto& lightNode = mcd["light"];
+			if (lightNode["source"])
+			{
+				// Push another entry for the same MCDIndex. modifyData applies them in
+				// order, so the nested-form value naturally wins as the later setter call.
+				int lightSource = lightNode["source"].readVal<int>();
+				_lightSources.push_back(std::make_pair(MCDIndex, lightSource));
+			}
+			if (lightNode["radius"])
+			{
+				int radius = lightNode["radius"].readVal<int>();
+				_lightRadii.push_back(std::make_pair(MCDIndex, radius));
+			}
+			if (lightNode["intensity"])
+			{
+				double intensity = lightNode["intensity"].readVal<double>();
+				_lightIntensities.push_back(std::make_pair(MCDIndex, intensity));
+			}
+			if (lightNode["offset"])
+			{
+				std::vector<int> offset = lightNode["offset"].readVal<std::vector<int> >();
+				if (offset.size() == 3)
+					_lightOffsets.push_back(std::make_pair(MCDIndex, offset));
+			}
+			if (lightNode["color"])
+			{
+				int r, g, b;
+				Palette::readColor(lightNode["color"], r, g, b);
+				std::vector<int> rgb;
+				rgb.push_back(r);
+				rgb.push_back(g);
+				rgb.push_back(b);
+				_lightColors.push_back(std::make_pair(MCDIndex, rgb));
+			}
+			if (lightNode["fullBright"])
+			{
+				bool fullBright = lightNode["fullBright"].readVal<bool>();
+				_fullBrights.push_back(std::make_pair(MCDIndex, fullBright ? 1 : 0));
+			}
 		}
 	}
 }
@@ -263,6 +285,20 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 	for (const auto& pair : _fullBrights)
 	{
 		dataSet->getObject(pair.first)->setFullBright(pair.second);
+	}
+	for (const auto& pair : _lightRadii)
+	{
+		int radius = pair.second;
+		if (radius < 1) radius = 1;
+		if (radius > 20) radius = 20;
+		dataSet->getObject(pair.first)->setModLightRadius(radius);
+	}
+	for (const auto& pair : _lightIntensities)
+	{
+		double intensity = pair.second;
+		if (intensity < 0.0) intensity = 0.0;
+		if (intensity > 5.0) intensity = 5.0;
+		dataSet->getObject(pair.first)->setModLightIntensity(intensity);
 	}
 }
 
