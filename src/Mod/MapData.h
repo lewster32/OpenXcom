@@ -162,6 +162,10 @@ public:
 	void setLitChance(double value);
 	/// Returns the per-source litChance. Default 1.0 (always lit).
 	double getLitChance() const { return _litChance; }
+	/// Returns true if this MapData should emit light / render fullBright at
+	/// the given tile instance, given its litChance and a deterministic hash
+	/// of (position, part). Stable for the duration of a battle.
+	bool isLitInstance(Position pos, TilePart part) const;
 	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses Options::oxceBattleColourLightAllowOverride so callers like Mod::autoDeriveLightColors can iterate every part that could ever emit.
 	bool hasAnyLightSource() const { return _lightSource > 0 || _hasModLightSource; }
 	/// Gets the light emission point offset in voxel coords.

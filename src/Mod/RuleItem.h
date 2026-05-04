@@ -711,6 +711,11 @@ public:
 	double getLightIntensity() const { return _lightIntensity; }
 	/// Returns the per-item litChance. Default 1.0 (always lit). Set via light.litChance in YAML.
 	double getLitChance() const { return _litChance; }
+	/// Returns true if a BattleItem with this ruleset should emit light /
+	/// render fullBright. Hashes on `itemId` (BattleItem::getId()) so the
+	/// roll is stable for the duration of the battle and follows the item
+	/// through pick-up and drop.
+	bool isLitInstance(int itemId) const;
 	/// Effective intensity for the addLight call. Returns the mod override if set,
 	/// otherwise the legacy-equivalent fallbackRange / 15.0 (where fallbackRange is
 	/// typically the per-BattleItem getGlowRange() since RuleItem itself has no

@@ -743,7 +743,10 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 		{
 			const MapData* floor = currTile->getMapData(O_FLOOR);
 			const MapData* obj = currTile->getMapData(O_OBJECT);
-			if ((floor && floor->getFullBright()) || (obj && obj->getFullBright()))
+			const Position currPos = currTile->getPosition();
+			const bool floorEmissive = floor && floor->getFullBright() && floor->isLitInstance(currPos, O_FLOOR);
+			const bool objEmissive = obj && obj->getFullBright() && obj->isLitInstance(currPos, O_OBJECT);
+			if (floorEmissive || objEmissive)
 			{
 				shade = std::min(shade, unitFullBrightShade);
 			}
@@ -1030,7 +1033,7 @@ void Map::drawTerrain(Surface *surface)
 						{
 							Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade, false, _nvColor);
 						}
-						else if (floorData && floorData->getFullBright())
+						else if (floorData && floorData->getFullBright() && floorData->isLitInstance(tile->getPosition(), O_FLOOR))
 						{
 							Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade);
 						}
@@ -1136,7 +1139,7 @@ void Map::drawTerrain(Surface *surface)
 							{
 								// 3-way: vanilla / emissive-FullBright / tinted (same as floor).
 								const MapData *objDataBack = tile->getMapData(O_OBJECT);
-								const bool objBackEmissive = objDataBack && objDataBack->getFullBright();
+								const bool objBackEmissive = objDataBack && objDataBack->getFullBright() && objDataBack->isLitInstance(tile->getPosition(), O_OBJECT);
 								const int objBackShade = tile->getObstacle(O_OBJECT) ? obstacleShade : tileShade;
 								if (!tintLUT)
 								{
@@ -1161,7 +1164,7 @@ void Map::drawTerrain(Surface *surface)
 							// flagged fullBright (default: BT_FLARE auto-detects on; modder may
 							// opt in for any item via `fullBright: true` or opt out via false).
 							// The floor under the item still tints normally.
-							const bool itemFullBright = tintLUT && item->getRules()->getFullBright();
+							const bool itemFullBright = tintLUT && item->getRules()->getFullBright() && item->getRules()->isLitInstance(item->getId());
 							itemSprite.draw(item,
 								screenPosition.x,
 								screenPosition.y + tile->getTerrainLevel(),
@@ -1460,7 +1463,7 @@ void Map::drawTerrain(Surface *surface)
 							{
 								// 3-way: vanilla / emissive-FullBright / tinted (same as floor block).
 								const MapData *objDataFront = tile->getMapData(O_OBJECT);
-								const bool objFrontEmissive = objDataFront && objDataFront->getFullBright();
+								const bool objFrontEmissive = objDataFront && objDataFront->getFullBright() && objDataFront->isLitInstance(tile->getPosition(), O_OBJECT);
 								const int objFrontShade = tile->getObstacle(O_OBJECT) ? obstacleShade : tileShade;
 								if (!tintLUT)
 								{

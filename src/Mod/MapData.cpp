@@ -18,6 +18,7 @@
  */
 #include "MapData.h"
 #include "../Engine/Options.h"
+#include "../Battlescape/LightingHash.h"
 
 namespace OpenXcom
 {
@@ -464,6 +465,18 @@ double MapData::getEffectiveLightIntensity() const
 {
 	if (_hasModLightIntensity) return _modLightIntensity;
 	return getLightSource() / 15.0;
+}
+
+/**
+ * Returns true if this MapData's light should be considered active for
+ * the instance at (pos, part). Default litChance 1.0 short-circuits to
+ * true; otherwise hashes the inputs and compares against litChance.
+ */
+bool MapData::isLitInstance(Position pos, TilePart part) const
+{
+	if (_litChance >= 1.0) return true;
+	const std::uint32_t h = LightingHash::mix(pos.x, pos.y, pos.z, static_cast<int>(part));
+	return LightingHash::passes(_litChance, h);
 }
 
 /**

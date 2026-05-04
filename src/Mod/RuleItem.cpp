@@ -23,6 +23,7 @@
 #include "Unit.h"
 #include "RuleItem.h"
 #include "RuleItemCategory.h"
+#include "../Battlescape/LightingHash.h"
 #include "RuleInventory.h"
 #include "RuleDamageType.h"
 #include "RuleSoldier.h"
@@ -1401,6 +1402,17 @@ bool RuleItem::getFullBright() const
 	if (_fullBright == -1)
 		return _battleType == BT_FLARE;
 	return _fullBright != 0;
+}
+
+/**
+ * Returns true if this item's light should be considered active for the
+ * BattleItem instance with id `itemId`. Default litChance 1.0 short-circuits.
+ */
+bool RuleItem::isLitInstance(int itemId) const
+{
+	if (_litChance >= 1.0) return true;
+	const std::uint32_t h = LightingHash::mix(itemId, 0, 0, 0);
+	return LightingHash::passes(_litChance, h);
 }
 
 /**

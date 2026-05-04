@@ -75,36 +75,6 @@ double computeFalloff(int distance, int radius)
     return (rawD - rawR) / (1.0 - rawR);
 }
 
-// Boost-style hash combiner for the deterministic litChance roll. Same inputs
-// always yield the same output; outputs are uniformly distributed across the
-// 32-bit range for the small-integer inputs we feed in (tile coords + part
-// index, or BattleItem id padded with zeros).
-inline uint32_t mixHashStep(uint32_t h, int v)
-{
-    h ^= static_cast<uint32_t>(v) + 0x9E3779B9u + (h << 6) + (h >> 2);
-    return h;
-}
-
-inline uint32_t mixHash(int a, int b, int c, int d)
-{
-    uint32_t h = 0;
-    h = mixHashStep(h, a);
-    h = mixHashStep(h, b);
-    h = mixHashStep(h, c);
-    h = mixHashStep(h, d);
-    return h;
-}
-
-// Returns true if the source with given litChance should emit light for this
-// instance, false if it should be suppressed. The hash provides the stable
-// pseudo-random input - same inputs => same answer for the whole battle.
-inline bool litRollPasses(double litChance, uint32_t hash)
-{
-    if (litChance >= 1.0) return true;
-    if (litChance <= 0.0) return false;
-    const double r = static_cast<double>(hash & 0xFFFFFFu) / static_cast<double>(0x1000000u);
-    return r < litChance;
-}
 
 /**
  * Calculates a line trajectory, using bresenham algorithm in 3D.
@@ -1103,14 +1073,8 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			auto tryMapData = [&](TilePart part)
 			{
 				MapData *md = tile->getMapData(part);
-				if (md && md->getEffectiveLightRadius() > currLight)
+				if (md && md->getEffectiveLightRadius() > currLight && md->isLitInstance(tile->getPosition(), part))
 				{
-					if (md->getLitChance() < 1.0)
-					{
-						const auto pos = tile->getPosition();
-						const uint32_t h = mixHash(pos.x, pos.y, pos.z, static_cast<int>(part));
-						if (!litRollPasses(md->getLitChance(), h)) return;
-					}
 					currLight = md->getEffectiveLightRadius();
 					winIntensity = md->getEffectiveLightIntensity();
 					md->getLightColor(winR, winG, winB);
@@ -1157,22 +1121,14 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 
 			for (const auto* bi : *tile->getInventory())
 			{
-				if (bi->getGlow())
+				if (bi->getGlow() && bi->getRules()->isLitInstance(bi->getId()))
 				{
-					const double litChance = bi->getRules()->getLitChance();
-					if (litChance < 1.0 && !litRollPasses(litChance, mixHash(bi->getId(), 0, 0, 0)))
+					int glowRange = bi->getGlowRange();
+					if (glowRange > currLight)
 					{
-						// Item rolled off; skip its glow contribution and continue inventory loop.
-					}
-					else
-					{
-						int glowRange = bi->getGlowRange();
-						if (glowRange > currLight)
-						{
-							currLight = glowRange;
-							winIntensity = bi->getRules()->getEffectiveLightIntensity(glowRange);
-							bi->getRules()->getLightColor(winR, winG, winB);
-						}
+						currLight = glowRange;
+						winIntensity = bi->getRules()->getEffectiveLightIntensity(glowRange);
+						bi->getRules()->getLightColor(winR, winG, winB);
 					}
 				}
 
@@ -1242,23 +1198,15 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			if (!w) continue;
 
-			if (w->getGlow())
+			if (w->getGlow() && w->getRules()->isLitInstance(w->getId()))
 			{
-				const double litChance = w->getRules()->getLitChance();
-				if (litChance < 1.0 && !litRollPasses(litChance, mixHash(w->getId(), 0, 0, 0)))
+				int glowRange = w->getGlowRange();
+				if (glowRange > currLight)
 				{
-					// Weapon's flare is off for this instance; skip its glow.
-				}
-				else
-				{
-					int glowRange = w->getGlowRange();
-					if (glowRange > currLight)
-					{
-						currLight = glowRange;
-						winIntensity = w->getRules()->getEffectiveLightIntensity(glowRange);
-						w->getRules()->getLightColor(winR, winG, winB);
-						winBypassLOS = !Options::oxceBattleRealisticLighting;
-					}
+					currLight = glowRange;
+					winIntensity = w->getRules()->getEffectiveLightIntensity(glowRange);
+					w->getRules()->getLightColor(winR, winG, winB);
+					winBypassLOS = !Options::oxceBattleRealisticLighting;
 				}
 			}
 
