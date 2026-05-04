@@ -1065,15 +1065,17 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 		[&](Tile* tile)
 		{
 			int currLight = 0;
+			double winIntensity = 0.0;
 			int winR = 255, winG = 255, winB = 255;
 			Position winOffset(0, 0, 0);
 
 			auto tryMapData = [&](TilePart part)
 			{
 				MapData *md = tile->getMapData(part);
-				if (md && md->getLightSource() > currLight)
+				if (md && md->getEffectiveLightRadius() > currLight)
 				{
-					currLight = md->getLightSource();
+					currLight = md->getEffectiveLightRadius();
+					winIntensity = md->getEffectiveLightIntensity();
 					md->getLightColor(winR, winG, winB);
 					winOffset = md->getLightOffset();
 				}
@@ -1087,6 +1089,7 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			if (tile->getFire() && unitFireLightPower > currLight)
 			{
 				currLight = unitFireLightPower;
+				winIntensity = FIRE_LIGHT_INTENSITY;
 				_save->getMod()->getFireLightColor(winR, winG, winB);
 				winOffset = Position(0, 0, 0);
 			}
@@ -1095,8 +1098,7 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			{
 				currLight = getMaxStaticLightDistance() - 1;
 			}
-			// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
-			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_FIRE, winR, winG, winB, false, winOffset);
+			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_FIRE, winR, winG, winB, false, winOffset);
 		}
 	);
 }
@@ -1113,6 +1115,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 		[&](Tile* tile)
 		{
 			int currLight = 0;
+			double winIntensity = 0.0;
 			int winR = 255, winG = 255, winB = 255;
 
 			for (const auto* bi : *tile->getInventory())
@@ -1123,6 +1126,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 					if (glowRange > currLight)
 					{
 						currLight = glowRange;
+						winIntensity = bi->getRules()->getEffectiveLightIntensity(glowRange);
 						bi->getRules()->getLightColor(winR, winG, winB);
 					}
 				}
@@ -1131,6 +1135,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 				if (bu && bu->getFire() && unitFireLightPowerStunned > currLight)
 				{
 					currLight = unitFireLightPowerStunned;
+					winIntensity = FIRE_LIGHT_INTENSITY;
 					_save->getMod()->getFireLightColor(winR, winG, winB);
 				}
 			}
@@ -1139,8 +1144,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
-			// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
-			addLight(gs, tile->getPosition(), currLight, currLight / 15.0, LL_ITEMS, winR, winG, winB);
+			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_ITEMS, winR, winG, winB);
 		}
 	);
 }
@@ -1158,6 +1162,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		}
 
 		int currLight = 0;
+		double winIntensity = 0.0;
 		int winR = 255, winG = 255, winB = 255;
 		bool winBypassLOS = false;
 
@@ -1167,6 +1172,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 			if (personalPower > currLight)
 			{
 				currLight = personalPower;
+				winIntensity = PERSONAL_LIGHT_INTENSITY;
 				_save->getMod()->getPersonalLightColor(winR, winG, winB);
 				winBypassLOS = !Options::oxceBattleRealisticLighting;
 			}
@@ -1197,6 +1203,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 				if (glowRange > currLight)
 				{
 					currLight = glowRange;
+					winIntensity = w->getRules()->getEffectiveLightIntensity(glowRange);
 					w->getRules()->getLightColor(winR, winG, winB);
 					winBypassLOS = !Options::oxceBattleRealisticLighting;
 				}
@@ -1206,6 +1213,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 			if (u && u->getFire() && unitFireLightPowerStunned > currLight)
 			{
 				currLight = unitFireLightPowerStunned;
+				winIntensity = FIRE_LIGHT_INTENSITY;
 				_save->getMod()->getFireLightColor(winR, winG, winB);
 				winBypassLOS = false;
 			}
@@ -1214,6 +1222,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		if (unit->getFire() && unitFireLightPower > currLight)
 		{
 			currLight = unitFireLightPower;
+			winIntensity = FIRE_LIGHT_INTENSITY;
 			_save->getMod()->getFireLightColor(winR, winG, winB);
 			winBypassLOS = false;
 		}
@@ -1237,8 +1246,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-				// currLight / 15.0 is the legacy-equivalent intensity fallback; Task 7 replaces this with the per-source winIntensity competition.
-				addLight(gs, pos + Position(x, y, 0), currLight, currLight / 15.0, LL_UNITS, winR, winG, winB, winBypassLOS);
+					addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS);
 			}
 		}
 	}
