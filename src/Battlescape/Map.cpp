@@ -838,7 +838,7 @@ void Map::drawTerrain(Surface *surface)
 	const bool nvActive = (_nvColor != 0) || (_debugVisionMode == 1);
 	const Uint8 *tintLUT = nullptr;
 	const bool perCorner = !nvActive && Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner;
-	if (!nvActive && Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
+	if (!nvActive && Options::oxceBattleRealisticLighting)
 	{
 		std::string tintPalName = "PAL_BATTLESCAPE";
 		if (_save->getDepth() > 0)
@@ -849,7 +849,7 @@ void Map::drawTerrain(Surface *surface)
 		}
 		Palette *tintPal = _game->getMod()->getPalette(tintPalName);
 		if (tintPal)
-			tintLUT = tintPal->getTintLUT(Options::oxceBattleColourLightMix);
+			tintLUT = tintPal->getTintLUT(100);
 	}
 
 	NumberText *_numWaypid = 0;

@@ -112,9 +112,7 @@ OPT int oxceCrashedOrLanded;
 OPT int oxceBattleSmokeOpacity;
 OPT int oxceBattleSmokeOpacityMin;
 OPT bool oxceBattleRealisticLighting;
-OPT int oxceBattleColourLightMix;
 OPT bool oxceBattleColourLightAllowOverride;
-OPT bool oxceBattleColourLightAmbient;
 OPT bool oxceBattleColourLightPerCorner;
 OPT int oxceBattleColourLightDither;
 

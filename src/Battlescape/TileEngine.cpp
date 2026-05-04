@@ -1396,13 +1396,8 @@ void TileEngine::finaliseTintPass()
 	if (!Options::oxceBattleRealisticLighting) return;
 
 	// Resolve ambient RGB for this global shade.
-	// Gate: oxceBattleColourLightAmbient. When off, fall back to a neutral greyscale
-	// ramp so users can disable mod-supplied coloured ambient without disabling the
-	// rest of the coloured-lighting pipeline. Greyscale matches vanilla shade
-	// behaviour: v = 255 - globalShade * 17.
-	// When on, per-mission AlienDeployment override takes precedence over the mod-wide default.
+	// Per-mission AlienDeployment override takes precedence over the mod-wide default.
 	int ambR, ambG, ambB;
-	if (Options::oxceBattleColourLightAmbient)
 	{
 		AlienDeployment *dep = _save->getMod()->getDeployment(_save->getMissionType(), false);
 		if (dep && dep->hasAmbientLightByShade())
@@ -1413,12 +1408,6 @@ void TileEngine::finaliseTintPass()
 		{
 			_save->getMod()->getAmbientColor(_save->getGlobalShade(), ambR, ambG, ambB);
 		}
-	}
-	else
-	{
-		int v = 255 - _save->getGlobalShade() * 17;
-		if (v < 0) v = 0;
-		ambR = ambG = ambB = v;
 	}
 
 	// Write ambient * skyVisibility into LL_AMBIENT for all 4 corners of every tile.
@@ -1466,7 +1455,7 @@ void TileEngine::finaliseTintPass()
 	// Bloom: wall-aware diffusion so ambient bleeds through doorways into interiors
 	// and shadow edges are softened. Must run BEFORE quantise so it sees full-precision
 	// accumulator values.
-	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightMix > 0)
+	if (Options::oxceBattleRealisticLighting)
 	{
 		bloomLighting();
 	}
@@ -1514,12 +1503,12 @@ void TileEngine::finaliseTintPass()
  * and redistributed to all 4 corners so per-corner asymmetry written by addLight
  * is preserved while keeping bloom cost equivalent to a single-corner pass.
  *
- * Only meaningful when oxceBattleColourLightMix > 0; finaliseTintPass gates the
+ * Only meaningful when oxceBattleRealisticLighting is on; finaliseTintPass gates the
  * call, but this function also returns immediately if the condition is not met.
  */
 void TileEngine::bloomLighting()
 {
-	if (!Options::oxceBattleRealisticLighting || Options::oxceBattleColourLightMix <= 0) return;
+	if (!Options::oxceBattleRealisticLighting) return;
 
 	const int sx = _save->getMapSizeX();
 	const int sy = _save->getMapSizeY();

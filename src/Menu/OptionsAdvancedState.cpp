@@ -391,7 +391,6 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		// The others alter the shape of the per-tile/per-corner data.
 		if (b == &Options::oxceBattleRealisticLighting ||
 			b == &Options::oxceBattleColourLightPerCorner ||
-			b == &Options::oxceBattleColourLightAmbient ||
 			b == &Options::oxceBattleColourLightAllowOverride)
 		{
 			recalculateBattleLighting();
@@ -406,8 +405,7 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 
 		int increment = (button == SDL_BUTTON_LEFT) ? 1 : -1; // left-click increases, right-click decreases
 		if (i == &Options::changeValueByMouseWheel || i == &Options::FPS || i == &Options::FPSInactive || i == &Options::oxceWoundedDefendBaseIf
-			|| i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin
-			|| i == &Options::oxceBattleColourLightMix)
+			|| i == &Options::oxceBattleSmokeOpacity || i == &Options::oxceBattleSmokeOpacityMin)
 		{
 			increment *= 10;
 		}
@@ -485,11 +483,6 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			min = 10;
 			max = 100;
 		}
-		else if (i == &Options::oxceBattleColourLightMix)
-		{
-			min = 0;
-			max = 100;
-		}
 		else if (i == &Options::oxceBattleColourLightDither)
 		{
 			// 0 = None, 1 = Bayer, 2 = Floyd-Steinberg
@@ -533,13 +526,6 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			*partner = *i;
 			refreshOptionRow(partner);
 			break;
-		}
-
-		// Mix changes the tintLUT row and finaliseTintPass output - needs a full
-		// recalc so the per-tile gridIdx is rebuilt against the new mix.
-		if (i == &Options::oxceBattleColourLightMix)
-		{
-			recalculateBattleLighting();
 		}
 
 		std::ostringstream ss;
