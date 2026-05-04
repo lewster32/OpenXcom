@@ -21,6 +21,18 @@
 #include "MapData.h"
 #include "../Engine/Palette.h"
 
+namespace
+{
+// Sanity ceilings for parse-time validation of MCDPatch light fields.
+// The runtime path re-clamps to the layer-specific max via
+// Mod::getMaxStatic/DynamicLightDistance() (currently 16 / 24 in OXCE);
+// these constants are a soft upper bound to reject obviously bogus
+// modder values without coupling MCDPatch to a Mod handle. Match the
+// equivalent local constants in RuleItem.cpp.
+constexpr int LIGHT_RADIUS_MAX = 20;
+constexpr double LIGHT_INTENSITY_MAX = 5.0;
+}
+
 namespace OpenXcom
 {
 
@@ -140,24 +152,29 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 			int lightSource = mcd["lightSource"].readVal<int>();
 			_lightSources.push_back(std::make_pair(MCDIndex, lightSource));
 		}
-		if (mcd["light"])
+		if (const auto& lightNode = mcd["light"])
 		{
-			const auto& lightNode = mcd["light"];
 			if (lightNode["source"])
 			{
-				// Push another entry for the same MCDIndex. modifyData applies them in
-				// order, so the nested-form value naturally wins as the later setter call.
+				// Push another entry for the same MCDIndex. The apply order in
+				// modifyData() (a simple iteration over _lightSources in push order)
+				// makes this nested light.source push override the earlier flat
+				// lightSource: push for the same MCDIndex; do not reorder this vector.
 				int lightSource = lightNode["source"].readVal<int>();
 				_lightSources.push_back(std::make_pair(MCDIndex, lightSource));
 			}
 			if (lightNode["radius"])
 			{
 				int radius = lightNode["radius"].readVal<int>();
+				if (radius < 1) radius = 1;
+				if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
 				_lightRadii.push_back(std::make_pair(MCDIndex, radius));
 			}
 			if (lightNode["intensity"])
 			{
 				double intensity = lightNode["intensity"].readVal<double>();
+				if (intensity < 0.0) intensity = 0.0;
+				if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
 				_lightIntensities.push_back(std::make_pair(MCDIndex, intensity));
 			}
 			if (lightNode["offset"])
@@ -288,17 +305,11 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 	}
 	for (const auto& pair : _lightRadii)
 	{
-		int radius = pair.second;
-		if (radius < 1) radius = 1;
-		if (radius > 20) radius = 20;
-		dataSet->getObject(pair.first)->setModLightRadius(radius);
+		dataSet->getObject(pair.first)->setModLightRadius(pair.second);
 	}
 	for (const auto& pair : _lightIntensities)
 	{
-		double intensity = pair.second;
-		if (intensity < 0.0) intensity = 0.0;
-		if (intensity > 5.0) intensity = 5.0;
-		dataSet->getObject(pair.first)->setModLightIntensity(intensity);
+		dataSet->getObject(pair.first)->setModLightIntensity(pair.second);
 	}
 }
 
