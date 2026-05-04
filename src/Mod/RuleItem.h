@@ -484,6 +484,7 @@ private:
 	bool _hasLightRadius;
 	double _lightIntensity;
 	bool _hasLightIntensity;
+	double _litChance;
 	std::vector<int> _customItemPreviewIndex;
 	int _kneelBonus, _oneHandedPenalty;
 	int _monthlySalary, _monthlyMaintenance;
@@ -698,6 +699,7 @@ public:
 		_lightRadius = 0;
 		_hasLightIntensity = false;
 		_lightIntensity = 0.0;
+		_litChance = 1.0;
 	}
 	/// True iff this RuleItem set an explicit light radius override.
 	bool hasLightRadius() const { return _hasLightRadius; }
@@ -707,6 +709,8 @@ public:
 	bool hasLightIntensity() const { return _hasLightIntensity; }
 	/// Explicit mod-supplied intensity. Caller must check hasLightIntensity() first.
 	double getLightIntensity() const { return _lightIntensity; }
+	/// Returns the per-item litChance. Default 1.0 (always lit). Set via light.litChance in YAML.
+	double getLitChance() const { return _litChance; }
 	/// Effective intensity for the addLight call. Returns the mod override if set,
 	/// otherwise the legacy-equivalent fallbackRange / 15.0 (where fallbackRange is
 	/// typically the per-BattleItem getGlowRange() since RuleItem itself has no

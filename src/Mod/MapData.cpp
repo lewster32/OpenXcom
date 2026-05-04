@@ -32,6 +32,7 @@ MapData::MapData(MapDataSet *dataset) : _dataset(dataset), _specialType(TILE),
 				_modLightSource(0), _hasModLightSource(false),
 				_modLightRadius(0), _hasModLightRadius(false),
 				_modLightIntensity(0.0), _hasModLightIntensity(false),
+				_litChance(1.0),
 				_lightOffset(0, 0, 0),
 				_lightColorR(255), _lightColorG(255), _lightColorB(255),
 				_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
@@ -432,6 +433,17 @@ void MapData::setModLightIntensity(double value)
 {
 	_modLightIntensity = value;
 	_hasModLightIntensity = true;
+}
+
+/**
+ * Sets the per-source litChance (clamped to [0.0, 1.0]).
+ * Called from MCDPatch::modifyData when light.litChance is set.
+ */
+void MapData::setLitChance(double value)
+{
+	if (value < 0.0) value = 0.0;
+	if (value > 1.0) value = 1.0;
+	_litChance = value;
 }
 
 /**

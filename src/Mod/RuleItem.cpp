@@ -197,6 +197,7 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_fullBright(-1),
 	_lightRadius(0), _hasLightRadius(false),
 	_lightIntensity(0.0), _hasLightIntensity(false),
+	_litChance(1.0),
 	_kneelBonus(-1), _oneHandedPenalty(-1),
 	_monthlySalary(0), _monthlyMaintenance(0),
 	_sprayWaypoints(0)
@@ -1448,6 +1449,13 @@ void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
 	if (lightNode["fullBright"])
 	{
 		_fullBright = lightNode["fullBright"].readVal<bool>() ? 1 : 0;
+	}
+	if (lightNode["litChance"])
+	{
+		double litChance = lightNode["litChance"].readVal<double>();
+		if (litChance < 0.0) litChance = 0.0;
+		if (litChance > 1.0) litChance = 1.0;
+		_litChance = litChance;
 	}
 }
 

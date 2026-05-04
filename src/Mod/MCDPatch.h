@@ -34,6 +34,7 @@ private:
 	std::vector<std::pair<size_t, std::vector<int> > > _LOFTS, _lightOffsets, _lightColors;
 	std::vector<std::pair<size_t, int> > _lightRadii;
 	std::vector<std::pair<size_t, double> > _lightIntensities;
+	std::vector<std::pair<size_t, double> > _litChances;
 public:
 	/// Creates an MCD Patch.
 	MCDPatch();

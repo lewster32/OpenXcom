@@ -177,6 +177,13 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 				if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
 				_lightIntensities.push_back(std::make_pair(MCDIndex, intensity));
 			}
+			if (lightNode["litChance"])
+			{
+				double litChance = lightNode["litChance"].readVal<double>();
+				if (litChance < 0.0) litChance = 0.0;
+				if (litChance > 1.0) litChance = 1.0;
+				_litChances.push_back(std::make_pair(MCDIndex, litChance));
+			}
 			if (lightNode["offset"])
 			{
 				std::vector<int> offset = lightNode["offset"].readVal<std::vector<int> >();
@@ -310,6 +317,10 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 	for (const auto& pair : _lightIntensities)
 	{
 		dataSet->getObject(pair.first)->setModLightIntensity(pair.second);
+	}
+	for (const auto& pair : _litChances)
+	{
+		dataSet->getObject(pair.first)->setLitChance(pair.second);
 	}
 }
 

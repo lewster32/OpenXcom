@@ -65,6 +65,7 @@ private:
 	bool _hasModLightRadius;
 	double _modLightIntensity;
 	bool _hasModLightIntensity;
+	double _litChance;
 	Position _lightOffset;
 	int _lightColorR, _lightColorG, _lightColorB;
 	int _modLightColorR, _modLightColorG, _modLightColorB;
@@ -156,6 +157,11 @@ public:
 	int getEffectiveLightRadius() const;
 	/// Effective intensity used by TileEngine::addLight. Returns the mod override if set, otherwise resolved lightSource / 15.0.
 	double getEffectiveLightIntensity() const;
+	/// Sets the per-source litChance (probability that this MCD's light is on for a given instance).
+	/// Called from MCDPatch when a light: { litChance: ... } sub-key is present.
+	void setLitChance(double value);
+	/// Returns the per-source litChance. Default 1.0 (always lit).
+	double getLitChance() const { return _litChance; }
 	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses Options::oxceBattleColourLightAllowOverride so callers like Mod::autoDeriveLightColors can iterate every part that could ever emit.
 	bool hasAnyLightSource() const { return _lightSource > 0 || _hasModLightSource; }
 	/// Gets the light emission point offset in voxel coords.
@@ -185,6 +191,7 @@ public:
 		_hasModLightColor = false;
 		_lightOffset = Position(0, 0, 0);
 		_fullBright = -1;
+		_litChance = 1.0;
 	}
 	/// True iff a mod-supplied lightColour override has been recorded.
 	bool hasModLightColor() const { return _hasModLightColor; }
