@@ -30,6 +30,8 @@ MapData::MapData(MapDataSet *dataset) : _dataset(dataset), _specialType(TILE),
 				_isUfoDoor(false), _stopLOS(false), _isNoFloor(false), _isGravLift(false), _isDoor(false), _blockFire(false), _blockSmoke(false), _baseModule(false),
 				_yOffset(0), _TUWalk(0), _TUFly(0), _TUSlide(0), _terrainLevel(0), _footstepSound(0), _dieMCD(0), _altMCD(0), _objectType(O_FLOOR), _lightSource(0),
 				_modLightSource(0), _hasModLightSource(false),
+				_modLightRadius(0), _hasModLightRadius(false),
+				_modLightIntensity(0.0), _hasModLightIntensity(false),
 				_lightOffset(0, 0, 0),
 				_lightColorR(255), _lightColorG(255), _lightColorB(255),
 				_modLightColorR(0), _modLightColorG(0), _modLightColorB(0), _hasModLightColor(false),
@@ -410,6 +412,46 @@ void MapData::setModLightSource(int value)
 {
 	_modLightSource = value;
 	_hasModLightSource = true;
+}
+
+/**
+ * Sets the mod-supplied lightRadius override.
+ * @param value New radius in tiles.
+ */
+void MapData::setModLightRadius(int value)
+{
+	_modLightRadius = value;
+	_hasModLightRadius = true;
+}
+
+/**
+ * Sets the mod-supplied lightIntensity override.
+ * @param value New intensity (0.0 = dark, 1.0 = full saturation, > 1 blows out toward white).
+ */
+void MapData::setModLightIntensity(double value)
+{
+	_modLightIntensity = value;
+	_hasModLightIntensity = true;
+}
+
+/**
+ * Returns the radius used by TileEngine::addLight. Mod override wins;
+ * otherwise falls back to the resolved lightSource value.
+ */
+int MapData::getEffectiveLightRadius() const
+{
+	if (_hasModLightRadius) return _modLightRadius;
+	return getLightSource();
+}
+
+/**
+ * Returns the centre brightness used by TileEngine::addLight. Mod override
+ * wins; otherwise the legacy-equivalent lightSource / 15.0.
+ */
+double MapData::getEffectiveLightIntensity() const
+{
+	if (_hasModLightIntensity) return _modLightIntensity;
+	return getLightSource() / 15.0;
 }
 
 /**

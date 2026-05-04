@@ -61,6 +61,10 @@ private:
 	int _lightSource;
 	int _modLightSource;
 	bool _hasModLightSource;
+	int _modLightRadius;
+	bool _hasModLightRadius;
+	double _modLightIntensity;
+	bool _hasModLightIntensity;
 	Position _lightOffset;
 	int _lightColorR, _lightColorG, _lightColorB;
 	int _modLightColorR, _modLightColorG, _modLightColorB;
@@ -142,6 +146,16 @@ public:
 	void setModLightSource(int value);
 	/// True iff a mod-supplied lightSource override has been recorded.
 	bool hasModLightSource() const { return _hasModLightSource; }
+	/// Sets the mod-supplied lightRadius override (called from MCDPatch nested light block).
+	void setModLightRadius(int value);
+	/// Sets the mod-supplied lightIntensity override (called from MCDPatch nested light block).
+	void setModLightIntensity(double value);
+	bool hasModLightRadius() const { return _hasModLightRadius; }
+	bool hasModLightIntensity() const { return _hasModLightIntensity; }
+	/// Effective radius used by TileEngine::addLight. Returns the mod override if set, otherwise the resolved lightSource (vanilla or mod) value.
+	int getEffectiveLightRadius() const;
+	/// Effective intensity used by TileEngine::addLight. Returns the mod override if set, otherwise resolved lightSource / 15.0.
+	double getEffectiveLightIntensity() const;
 	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses Options::oxceBattleColourLightAllowOverride so callers like Mod::autoDeriveLightColors can iterate every part that could ever emit.
 	bool hasAnyLightSource() const { return _lightSource > 0 || _hasModLightSource; }
 	/// Gets the light emission point offset in voxel coords.
@@ -163,6 +177,10 @@ public:
 	{
 		_modLightSource = 0;
 		_hasModLightSource = false;
+		_modLightRadius = 0;
+		_hasModLightRadius = false;
+		_modLightIntensity = 0.0;
+		_hasModLightIntensity = false;
 		_modLightColorR = _modLightColorG = _modLightColorB = 0;
 		_hasModLightColor = false;
 		_lightOffset = Position(0, 0, 0);
