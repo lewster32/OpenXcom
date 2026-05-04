@@ -44,6 +44,14 @@ namespace OpenXcom
 namespace
 {
 
+// Sanity ceilings for parse-time validation of RuleItem light fields.
+// The runtime path re-clamps to the layer-specific max via
+// Mod::getMaxStatic/DynamicLightDistance() (currently 16 / 24 in OXCE);
+// these constants are a soft upper bound to reject obviously bogus
+// modder values. Match the equivalent local constants in MCDPatch.cpp.
+constexpr int LIGHT_RADIUS_MAX = 20;
+constexpr double LIGHT_INTENSITY_MAX = 5.0;
+
 /**
  * Update `attacker` from `weapon_item`.
  */
@@ -663,15 +671,34 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 	reader.tryRead("vaporDensitySurface", _vaporDensitySurface);
 	reader.tryRead("vaporProbabilitySurface", _vaporProbabilitySurface);
 
-	if (reader["lightColor"])
+	if (const auto& lightNode = reader["light"])
 	{
-		int r, g, b;
-		Palette::readColor(reader["lightColor"], r, g, b);
-		setModLightColor(r, g, b);
-	}
-	if (reader["fullBright"])
-	{
-		_fullBright = reader["fullBright"].readVal<bool>() ? 1 : 0;
+		if (lightNode["color"])
+		{
+			int r, g, b;
+			Palette::readColor(lightNode["color"], r, g, b);
+			setModLightColor(r, g, b);
+		}
+		if (lightNode["radius"])
+		{
+			int radius = lightNode["radius"].readVal<int>();
+			if (radius < 1) radius = 1;
+			if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
+			_lightRadius = radius;
+			_hasLightRadius = true;
+		}
+		if (lightNode["intensity"])
+		{
+			double intensity = lightNode["intensity"].readVal<double>();
+			if (intensity < 0.0) intensity = 0.0;
+			if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
+			_lightIntensity = intensity;
+			_hasLightIntensity = true;
+		}
+		if (lightNode["fullBright"])
+		{
+			_fullBright = lightNode["fullBright"].readVal<bool>() ? 1 : 0;
+		}
 	}
 
 	mod->loadSpriteOffset(_type, _customItemPreviewIndex, reader["customItemPreviewIndex"], "CustomItemPreviews");
