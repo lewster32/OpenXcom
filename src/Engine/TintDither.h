@@ -17,8 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <vector>
-
 namespace OpenXcom
 {
 
@@ -35,7 +33,8 @@ namespace OpenXcom
  *                      no inter-pixel state.
  *   FLOYD_STEINBERG  - error diffusion; per-pixel residual is distributed to
  *                      right + 3 below neighbours (weights /16: 7, 3, 5, 1).
- *                      Allocates two scanline-length error buffers per channel.
+ *                      Uses thread_local scratch buffers shared across blits;
+ *                      construction zero-initialises [0, spriteWidth) on demand.
  *
  * Usage per blit:
  *   TintDither d(mode, spriteWidth);
@@ -45,13 +44,16 @@ namespace OpenXcom
  *       int r, g, b; d.quantise(px, r16, g16, b16, r, g, b);
  *       ...
  *     d.endRow();
+ *
+ * Not safe for re-entrant or interleaved use within a single thread (FS scratch
+ * is shared file-scope state). drawTerrain calls are sequential, so this holds.
  */
 class TintDither
 {
 public:
 	enum Mode { NONE = 0, BAYER = 1, FLOYD_STEINBERG = 2 };
 
-	/// Construct for a sprite of the given width. FS allocates ~6 * spriteWidth ints; other modes are zero-cost.
+	/// Construct for a sprite of the given width. FS lazily resizes thread_local scratch and zeroes [0, spriteWidth). NONE/BAYER are zero-cost.
 	TintDither(int mode, int spriteWidth);
 
 	/// Update per-row state. Call once per scanline before iterating pixels.
@@ -67,9 +69,6 @@ private:
 	Mode _mode;
 	int _spriteWidth;
 	const int *_bayerRow;        // points into a static 4x4 matrix; valid only after beginRow()
-	// Owned only when _mode == FLOYD_STEINBERG; otherwise empty.
-	std::vector<int> _errR_cur, _errG_cur, _errB_cur;
-	std::vector<int> _errR_next, _errG_next, _errB_next;
 };
 
 }

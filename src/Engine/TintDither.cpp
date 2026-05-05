@@ -18,6 +18,7 @@
  */
 #include "TintDither.h"
 #include <algorithm>
+#include <vector>
 
 namespace OpenXcom
 {
@@ -34,6 +35,27 @@ namespace
 		{  3, 11,  1,  9 },
 		{ 15,  7, 13,  5 }
 	};
+
+	// Floyd-Steinberg error scratch, hoisted out of TintDither so we don't
+	// allocate 6 std::vector<int> per blit. Sized to the widest sprite seen so
+	// far on this thread; only [0, currentWidth) is touched per blit. Zero-fill
+	// happens lazily in TintDither's constructor when FS mode is active.
+	thread_local std::vector<int> g_errR_cur, g_errG_cur, g_errB_cur;
+	thread_local std::vector<int> g_errR_next, g_errG_next, g_errB_next;
+
+	void prepareFsScratch(int width)
+	{
+		auto prep = [width](std::vector<int>& v) {
+			if ((int)v.size() < width) v.resize(width);
+			std::fill(v.begin(), v.begin() + width, 0);
+		};
+		prep(g_errR_cur);
+		prep(g_errG_cur);
+		prep(g_errB_cur);
+		prep(g_errR_next);
+		prep(g_errG_next);
+		prep(g_errB_next);
+	}
 }
 
 TintDither::TintDither(int mode, int spriteWidth)
@@ -43,12 +65,7 @@ TintDither::TintDither(int mode, int spriteWidth)
 		_mode = NONE; // out-of-range option value: degrade to no-dither
 	if (_mode == FLOYD_STEINBERG)
 	{
-		_errR_cur.assign(spriteWidth, 0);
-		_errG_cur.assign(spriteWidth, 0);
-		_errB_cur.assign(spriteWidth, 0);
-		_errR_next.assign(spriteWidth, 0);
-		_errG_next.assign(spriteWidth, 0);
-		_errB_next.assign(spriteWidth, 0);
+		prepareFsScratch(spriteWidth);
 	}
 }
 
@@ -63,9 +80,9 @@ void TintDither::quantise(int px, int rIn, int gIn, int bIn, int &r, int &g, int
 	{
 		// Add accumulated error from earlier passes (right-propagation from
 		// this row's earlier pixels and 3-element broadcast from prev row).
-		const int rE = rIn + _errR_cur[px];
-		const int gE = gIn + _errG_cur[px];
-		const int bE = bIn + _errB_cur[px];
+		const int rE = rIn + g_errR_cur[px];
+		const int gE = gIn + g_errG_cur[px];
+		const int bE = bIn + g_errB_cur[px];
 		// Clamped quantise: drop the 4-bit fraction, clip to [0,15].
 		r = rE >> 4; if (r > 15) r = 15; else if (r < 0) r = 0;
 		g = gE >> 4; if (g > 15) g = 15; else if (g < 0) g = 0;
@@ -81,24 +98,24 @@ void TintDither::quantise(int px, int rIn, int gIn, int bIn, int &r, int &g, int
 		//   3     5     1
 		if (px + 1 < _spriteWidth)
 		{
-			_errR_cur[px + 1]  += rErr * 7 / 16;
-			_errG_cur[px + 1]  += gErr * 7 / 16;
-			_errB_cur[px + 1]  += bErr * 7 / 16;
+			g_errR_cur[px + 1]  += rErr * 7 / 16;
+			g_errG_cur[px + 1]  += gErr * 7 / 16;
+			g_errB_cur[px + 1]  += bErr * 7 / 16;
 		}
 		if (px > 0)
 		{
-			_errR_next[px - 1] += rErr * 3 / 16;
-			_errG_next[px - 1] += gErr * 3 / 16;
-			_errB_next[px - 1] += bErr * 3 / 16;
+			g_errR_next[px - 1] += rErr * 3 / 16;
+			g_errG_next[px - 1] += gErr * 3 / 16;
+			g_errB_next[px - 1] += bErr * 3 / 16;
 		}
-		_errR_next[px]     += rErr * 5 / 16;
-		_errG_next[px]     += gErr * 5 / 16;
-		_errB_next[px]     += bErr * 5 / 16;
+		g_errR_next[px]     += rErr * 5 / 16;
+		g_errG_next[px]     += gErr * 5 / 16;
+		g_errB_next[px]     += bErr * 5 / 16;
 		if (px + 1 < _spriteWidth)
 		{
-			_errR_next[px + 1] += rErr * 1 / 16;
-			_errG_next[px + 1] += gErr * 1 / 16;
-			_errB_next[px + 1] += bErr * 1 / 16;
+			g_errR_next[px + 1] += rErr * 1 / 16;
+			g_errG_next[px + 1] += gErr * 1 / 16;
+			g_errB_next[px + 1] += bErr * 1 / 16;
 		}
 		return;
 	}
@@ -125,13 +142,14 @@ void TintDither::endRow()
 {
 	if (_mode != FLOYD_STEINBERG) return;
 	// Slide the window: yesterday's "next" becomes today's "cur"; recycle
-	// yesterday's "cur" buffer to a zero-filled "next".
-	std::swap(_errR_cur, _errR_next);
-	std::swap(_errG_cur, _errG_next);
-	std::swap(_errB_cur, _errB_next);
-	std::fill(_errR_next.begin(), _errR_next.end(), 0);
-	std::fill(_errG_next.begin(), _errG_next.end(), 0);
-	std::fill(_errB_next.begin(), _errB_next.end(), 0);
+	// yesterday's "cur" buffer to a zero-filled "next". Only zero [0, _spriteWidth)
+	// since the tail (if any) was never written by this blit.
+	std::swap(g_errR_cur, g_errR_next);
+	std::swap(g_errG_cur, g_errG_next);
+	std::swap(g_errB_cur, g_errB_next);
+	std::fill(g_errR_next.begin(), g_errR_next.begin() + _spriteWidth, 0);
+	std::fill(g_errG_next.begin(), g_errG_next.begin() + _spriteWidth, 0);
+	std::fill(g_errB_next.begin(), g_errB_next.begin() + _spriteWidth, 0);
 }
 
 }

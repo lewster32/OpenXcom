@@ -1033,12 +1033,22 @@ void Map::drawTerrain(Surface *surface)
 						}
 						else if (perCorner)
 						{
-							Surface::blitRawTintFloor(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade,
-								tile->getGridIdx(0), tile->getGridIdx(1), tile->getGridIdx(2), tile->getGridIdx(3), tintLUT);
+							// Saturated corners (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity).
+							const Uint16 gNW = tile->getGridIdx(0), gNE = tile->getGridIdx(1);
+							const Uint16 gSW = tile->getGridIdx(2), gSE = tile->getGridIdx(3);
+							if (floorShade < 16 && gNW == 0xFFF && gNE == 0xFFF && gSW == 0xFFF && gSE == 0xFFF)
+								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), 0);
+							else
+								Surface::blitRawTintFloor(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade,
+									gNW, gNE, gSW, gSE, tintLUT);
 						}
 						else
 						{
-							Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade, tile->getAvgGridIdx(), tintLUT);
+							const Uint16 avgIdx = tile->getAvgGridIdx();
+							if (floorShade < 16 && avgIdx == 0xFFF)
+								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), 0);
+							else
+								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_FLOOR), floorShade, avgIdx, tintLUT);
 						}
 					}
 
@@ -1106,16 +1116,24 @@ void Map::drawTerrain(Surface *surface)
 									// left edge (sprite-x = 0), NW corner at the diamond's top
 									// vertex (sprite-x = srcW/2). Pixels past the midline (slight
 									// perspective bleed, decorations) clamp to the NW endpoint.
+									// Saturated endpoints (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity).
 									const int srcW = tmpSurface.getWidth();
-									Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade,
-										0, srcW / 2,
-										tile->getGridIdx(2), tile->getGridIdx(0),
-										tintLUT);
+									const Uint16 gSW = tile->getGridIdx(2), gNW = tile->getGridIdx(0);
+									if (wWShade < 16 && gSW == 0xFFF && gNW == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), 0);
+									else
+										Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade,
+											0, srcW / 2,
+											gSW, gNW,
+											tintLUT);
 								}
 								else
 								{
-									const int wallWGridIdx = tile->getAvgGridIdx();
-									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, wallWGridIdx, tintLUT);
+									const Uint16 wallWGridIdx = tile->getAvgGridIdx();
+									if (wWShade < 16 && wallWGridIdx == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), 0);
+									else
+										Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, wallWGridIdx, tintLUT);
 								}
 							}
 							else
@@ -1140,16 +1158,24 @@ void Map::drawTerrain(Surface *surface)
 									// perspective bleed) clamp to the NW endpoint. clipForWestWall
 									// forwards the half-clip flag so the upper-left half is skipped
 									// when the same tile already drew a west wall.
+									// Saturated endpoints (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity).
 									const int srcW = tmpSurface.getWidth();
-									Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade,
-										srcW / 2, srcW,
-										tile->getGridIdx(0), tile->getGridIdx(1),
-										tintLUT, clipForWestWall);
+									const Uint16 gNW = tile->getGridIdx(0), gNE = tile->getGridIdx(1);
+									if (wNShade < 16 && gNW == 0xFFF && gNE == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), 0, clipForWestWall);
+									else
+										Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade,
+											srcW / 2, srcW,
+											gNW, gNE,
+											tintLUT, clipForWestWall);
 								}
 								else
 								{
-									const int wallNGridIdx = tile->getAvgGridIdx();
-									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT, clipForWestWall);
+									const Uint16 wallNGridIdx = tile->getAvgGridIdx();
+									if (wNShade < 16 && wallNGridIdx == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), 0, clipForWestWall);
+									else
+										Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT, clipForWestWall);
 								}
 							}
 							else
@@ -1177,8 +1203,12 @@ void Map::drawTerrain(Surface *surface)
 								}
 								else
 								{
-									const int objBackGridIdx = tile->getAvgGridIdx();
-									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade, objBackGridIdx, tintLUT);
+									// Saturated grid (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity, mirroring the natural unlit sprite).
+									const Uint16 objBackGridIdx = tile->getAvgGridIdx();
+									if (objBackShade < 16 && objBackGridIdx == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), 0);
+									else
+										Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade, objBackGridIdx, tintLUT);
 								}
 							}
 						}
@@ -1501,8 +1531,12 @@ void Map::drawTerrain(Surface *surface)
 								}
 								else
 								{
-									const int objFrontGridIdx = tile->getAvgGridIdx();
-									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade, objFrontGridIdx, tintLUT);
+									// Saturated grid (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity, mirroring the natural unlit sprite).
+									const Uint16 objFrontGridIdx = tile->getAvgGridIdx();
+									if (objFrontShade < 16 && objFrontGridIdx == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), 0);
+									else
+										Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade, objFrontGridIdx, tintLUT);
 								}
 							}
 						}

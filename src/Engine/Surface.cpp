@@ -1034,6 +1034,16 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
                                Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
                                const Uint8 *tintLUT)
 {
+	// All 4 corners equal -> bilinear collapses to a constant. Output is
+	// byte-identical to the averaged blitRawTint path (dither is a no-op when
+	// the input has no sub-cell fraction). Common in uniform-light regions and
+	// FoW; skips the full TintDither + bilinear inner loop.
+	if (gridNW == gridNE && gridNW == gridSW && gridNW == gridSE)
+	{
+		blitRawTint(destSurf, srcSurf, x, y, shade, gridNW, tintLUT);
+		return;
+	}
+
 	// Unpack each corner into 4-bit (0-15) per-channel values.
 	int nwR = (gridNW >> 8) & 0xF, nwG = (gridNW >> 4) & 0xF, nwB = gridNW & 0xF;
 	int neR = (gridNE >> 8) & 0xF, neG = (gridNE >> 4) & 0xF, neB = gridNE & 0xF;
@@ -1157,6 +1167,14 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
                               Uint16 gridStart, Uint16 gridEnd,
                               const Uint8 *tintLUT, bool half)
 {
+	// Endpoints equal -> linear collapses to a constant. Output is byte-identical
+	// to the averaged blitRawTint path; skip the dither + per-pixel interp loop.
+	if (gridStart == gridEnd)
+	{
+		blitRawTint(destSurf, srcSurf, x, y, shade, gridStart, tintLUT, half);
+		return;
+	}
+
 	// Unpack endpoints into 4-bit (0..15) per-channel values.
 	const int sR = (gridStart >> 8) & 0xF, sG = (gridStart >> 4) & 0xF, sB = gridStart & 0xF;
 	const int eR = (gridEnd   >> 8) & 0xF, eG = (gridEnd   >> 4) & 0xF, eB = gridEnd   & 0xF;
