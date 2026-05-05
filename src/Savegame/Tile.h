@@ -311,10 +311,6 @@ public:
 	int getLightMulti(LightLayers layer) const;
 	/// Get the shade amount.
 	int getShade() const;
-	/// Gets the light value on a specific layer (used by the bloom diffusion pass).
-	int getLightLayer(int layer) const { return _light[layer]; }
-	/// Sets the light value on a specific layer directly (used by the bloom diffusion pass).
-	void setLightLayer(int layer, int value) { _light[layer] = (Uint8)(value > 15 ? 15 : (value < 0 ? 0 : value)); }
 	/// Gets the per-tile open-sky visibility factor [0,15]. Computed once at battle init.
 	Uint8 getSkyVisibility() const { return _skyVisibility; }
 	/// Sets the per-tile open-sky visibility factor [0,15].
@@ -404,8 +400,6 @@ public:
 	void removeItem(BattleItem *item);
 	/// Get top-most item
 	BattleItem* getTopItem();
-	/// Returns the topmost (heaviest) inventory item, or null if the inventory is empty. Matches the item that getTopItem would return. Used by lighting to find an emissive ground item (e.g. dropped flare).
-	const BattleItem* getTopItem() const;
 	/// New turn preparations.
 	void prepareNewTurn(bool smokeDamage);
 	/// Get inventory on this tile.

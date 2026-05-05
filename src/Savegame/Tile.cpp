@@ -1192,33 +1192,6 @@ Uint16 Tile::getAvgGridIdx() const
 	return (Uint16)((qR << 8) | (qG << 4) | qB);
 }
 
-/**
- * Returns the topmost (heaviest) inventory item, or null when the inventory is empty.
- * Const overload - delegates to the non-const version's logic.
- * Matches the item that the non-const getTopItem would return.
- * Used by the lighting code to inspect emissive ground items (e.g. a dropped flare).
- */
-const BattleItem* Tile::getTopItem() const
-{
-	if (_inventory.empty()) return 0;
-	// For large piles use the same fast path as the non-const version.
-	if (_inventory.size() > 100) return _inventory.front();
-	int biggestWeight = -999;
-	const BattleItem* biggest = 0;
-	for (const auto* bi : _inventory)
-	{
-		if (bi->getUnit()) return bi;
-		int temp = bi->getTotalWeight();
-		if (temp > biggestWeight)
-		{
-			biggestWeight = temp;
-			biggest = bi;
-		}
-	}
-	return biggest;
-}
-
-
 ////////////////////////////////////////////////////////////
 //					Script binding
 ////////////////////////////////////////////////////////////

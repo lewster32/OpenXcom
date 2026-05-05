@@ -621,8 +621,8 @@ Mod::Mod() :
 		_ambientColorsByShade[s][1] = v;
 		_ambientColorsByShade[s][2] = v;
 	}
-	// Defaults for the previously-hardcoded TileEngine light colours.
-	// Mod overrides: personalLightColor / fireLightColor.
+	// Defaults for personal-light and fire-light tints (mod overrides:
+	// personalLightColor / fireLightColor).
 	_personalLightColor[0] = 128; _personalLightColor[1] = 128; _personalLightColor[2] = 128;
 	_fireLightColor[0]     = 255; _fireLightColor[1]     = 128; _fireLightColor[2]     = 0;
 }
@@ -1166,6 +1166,9 @@ int Mod::parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable
 	return anchors;
 }
 
+/**
+ * Gets the mod-supplied personal-light tint, or the default (128, 128, 128).
+ */
 void Mod::getPersonalLightColor(int &r, int &g, int &b) const
 {
 	r = _personalLightColor[0];
@@ -1173,6 +1176,9 @@ void Mod::getPersonalLightColor(int &r, int &g, int &b) const
 	b = _personalLightColor[2];
 }
 
+/**
+ * Gets the mod-supplied fire-light tint, or the default (255, 128, 0).
+ */
 void Mod::getFireLightColor(int &r, int &g, int &b) const
 {
 	r = _fireLightColor[0];
@@ -6955,17 +6961,9 @@ void Mod::autoDeriveLightColors()
 }
 
 /**
- * Hot-reload lighting fields from disk for the active mod stack. Walks every .rul file
- * (in the same mod-priority order as loadAll) and re-parses just the lighting-related
- * sections - top-level personalLightColor / fireLightColor / ambientLightByShade,
- * MCDPatches' lightSource / lightColor / lightOffset / fullBright, and per-item
- * lightColor / fullBright. The mod-supplied track is reset on every MapData and
- * RuleItem first so YAML entries the modder removed since startup actually fall back
- * to vanilla / auto-derived values rather than persisting from memory.
- *
- * Auto-derived RGB and non-lighting rule fields are untouched. Per-file exceptions are
- * caught and logged so a YAML typo in one rul does not abort the whole reload. Caller is
- * responsible for triggering TileEngine::recalculateLighting() afterwards.
+ * Hot-reload lighting fields from disk: re-parses the mod stack's lighting-related
+ * YAML sections only. Mod-supplied tracks are reset first so removed entries fall
+ * back to defaults. Caller must trigger TileEngine::recalculateLighting() afterwards.
  */
 void Mod::reloadLightingRules()
 {

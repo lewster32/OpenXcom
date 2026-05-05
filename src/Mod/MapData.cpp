@@ -459,7 +459,7 @@ int MapData::getEffectiveLightRadius() const
 
 /**
  * Returns the centre brightness used by TileEngine::addLight. Mod override
- * wins; otherwise the legacy-equivalent lightSource / 15.0.
+ * wins; otherwise lightSource / 15.0.
  */
 double MapData::getEffectiveLightIntensity() const
 {
@@ -499,10 +499,8 @@ void MapData::setLightOffset(Position offset)
 
 /**
  * Whether this MCD should be rendered fullbright (sprite at max shade, no tint LUT applied).
- * If the modder didn't set `fullBright`, fall back to the legacy auto-detect: anything
- * with a non-zero lightSource was historically drawn fullbright, so preserve that for
- * backwards compatibility. An explicit `fullBright: false` opts out (useful for large
- * objects like alien tanks where only a small panel actually glows).
+ * Default: any part with a non-zero lightSource emits. Modders override per-part
+ * via `fullBright: true/false`.
  */
 bool MapData::getFullBright() const
 {

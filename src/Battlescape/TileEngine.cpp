@@ -66,13 +66,13 @@ constexpr double PERSONAL_LIGHT_INTENSITY = 0.8;
 // Yields exactly 1.0 at d=0 and 0.0 at d=r, with a smooth tail.
 double computeFalloff(int distance, int radius)
 {
-    assert(distance >= 0);
-    if (radius <= 0 || distance >= radius) return 0.0;
-    const double d2 = static_cast<double>(distance) * distance;
-    const double r2 = static_cast<double>(radius)   * radius;
-    const double rawD = 1.0 / (1.0 + LIGHT_FALLOFF_K * d2);
-    const double rawR = 1.0 / (1.0 + LIGHT_FALLOFF_K * r2);
-    return (rawD - rawR) / (1.0 - rawR);
+	assert(distance >= 0);
+	if (radius <= 0 || distance >= radius) return 0.0;
+	const double d2 = static_cast<double>(distance) * distance;
+	const double r2 = static_cast<double>(radius)   * radius;
+	const double rawD = 1.0 / (1.0 + LIGHT_FALLOFF_K * d2);
+	const double rawR = 1.0 / (1.0 + LIGHT_FALLOFF_K * r2);
+	return (rawD - rawR) / (1.0 - rawR);
 }
 
 
@@ -1371,7 +1371,11 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 		}
 	);
 
-	if (layer <= LL_AMBIENT) { calculateSkyVisibility(); calculateSunShading(gsStatic); }
+	if (layer <= LL_AMBIENT)
+	{
+		calculateSkyVisibility();
+		calculateSunShading(gsStatic);
+	}
 	if (layer <= LL_FIRE) calculateTerrainBackground(gsStatic);
 	if (layer <= LL_ITEMS) calculateTerrainItems(gsDynamic);
 	if (layer <= LL_UNITS) calculateUnitLighting(gsDynamic);
@@ -1424,15 +1428,9 @@ void TileEngine::finaliseTintPass()
 			tile->setAccumRGB(aR, aG, aB, LL_AMBIENT, c);
 	}
 
-	// Snapshot the accumulator state at this point - after addLight wrote each
-	// source-layer's contributions and after the ambient overwrite above. Bloom
-	// and stitch below are presentation-only passes that mutate accumulators in
-	// place; we restore the snapshot after quantise so subsequent partial recalcs
-	// (e.g. calculateLighting(LL_UNITS) on a personal-light toggle, which only
-	// resets LL_UNITS) see pristine source values rather than a bloom-spread copy.
-	// Without this, each partial recalc feeds the previous bloom output back into
-	// bloomLighting()'s max-with-decay, ratcheting LL_FIRE/LL_ITEMS coverage
-	// outward by one tile per toggle and never converging.
+	// Snapshot accumulators before bloom/stitch and restore after quantise so
+	// partial recalcs (e.g. LL_UNITS only) read source values, not bloom output -
+	// bloom on bloom diverges.
 	const int totalTiles = _save->getMapSizeXYZ();
 	std::vector<Uint8> snapshotR(totalTiles * LL_MAX * 4);
 	std::vector<Uint8> snapshotG(totalTiles * LL_MAX * 4);
@@ -1634,29 +1632,19 @@ void TileEngine::bloomLighting()
 /**
  * For every shared world-vertex, takes the per-channel per-layer MAX across all
  * (up to 4) tile corners that share that vertex, then writes it back. Walls
- * gate the reconciliation: refs are first grouped into connected components
- * (orthogonal neighbours that are NOT separated by a horizontalBlockage), and
- * MAX-then-write is applied within each component independently. This stops
- * a lit tile (e.g. a wall tile that took a direct hit from a nearby light)
- * from promoting its corner brightness onto the dark neighbour on the far
- * side of a wall - which is what produced the visible "fringe behind walls"
- * in earlier builds.
+ * gate the reconciliation: refs are grouped into connected components by
+ * union-find over orthogonal neighbours that are NOT separated by a
+ * horizontalBlockage, and MAX-then-write is applied per component, so a lit
+ * tile cannot promote its corner brightness onto the dark neighbour on the
+ * far side of a wall.
  *
  * Spatial layout around vertex (vx, vy):
  *   NW=tile (vx-1, vy-1) corner SE(3)  |  NE=tile (vx,   vy-1) corner SW(2)
  *   ------------------------------------+------------------------------------
  *   SW=tile (vx-1, vy  ) corner NE(1)  |  SE=tile (vx,   vy  ) corner NW(0)
  *
- * Edges form a 4-cycle: NW-NE, NE-SE, SE-SW, SW-NW. Diagonals (NW-SE, NE-SW)
- * share only the vertex; union-find connects them transitively if a clear
- * orthogonal path exists. A tile sealed off by walls on every shared edge
- * becomes a singleton component and is left alone (its corner keeps the
- * original addLight value rather than getting MAX-promoted across a wall).
- *
  * Map-edge tiles hold fewer references and are skipped by the bounds check.
- *
- * Only meaningful in per-corner mode; finaliseTintPass gates the call, but this
- * function also returns immediately if the condition is not met.
+ * Only meaningful in per-corner mode; the early return enforces that.
  */
 void TileEngine::stitchVertices()
 {
@@ -1807,10 +1795,7 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			const auto targetLight = tile->getLightMulti(layer);
 			const double falloff = computeFalloff(distance, radius);
 			const double effective = intensity * falloff;
-			// Linear scalar - tiles, items, and corpses dim with distance like physical
-			// light. Units get a perceptual softening at draw time (Map::drawUnit) via
-			// LightingHash::SCALAR_GAMMA, so they stay visible far from a light source's
-			// centre without flattening item or tile shading on the same tile.
+			// Linear scalar; perceptual gamma is applied only to units in Map::drawUnit.
 			auto currLight = std::min(15, (int)std::round(effective * 15.0));
 
 			if (clasicLighting)
@@ -1856,8 +1841,6 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			// Snapshot the pre-LOS scalar so the post-LOS RGB write can compute the
 			// attenuation fraction and apply it to the pre-LOS effective double.
 			const auto currLightBeforeLos = currLight;
-			// Named losPowerA/losPowerB (not lightA/lightB) to avoid shadowing the
-			// `lightB` parameter (blue channel of the light colour) in this scope.
 			auto losPowerA = currLight;
 			auto losPowerB = currLight;
 
@@ -1901,14 +1884,8 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 					{
 						light -= 1;
 					}
-					// Under-step (path's voxel-z is below the next tile's cached blocker height)
-					// would normally cost 2 power per step. That penalty is what kills terrain
-					// MCD lights inside the Avenger / craft hulls (every step under tall hull
-					// objects shaves -2). Source-of-truth coloured-lighting used a binary LOS
-					// (clear or blocked, no per-step decay), so under realistic-lighting we
-					// match it - walls still hard-block via getBlockDir above, and smoke decay
-					// stays for gameplay nuance. OXCE mods opting in via `lighting: { enhanced: N }`
-					// (with realistic-lighting OFF) keep the original penalty for tuning parity.
+					// Realistic lighting uses binary LOS; only the legacy path applies the
+					// under-step penalty (which kills terrain MCD lights inside tall hulls).
 					if (!Options::oxceBattleRealisticLighting && height < cache.height)
 					{
 						light -= 2;
@@ -1943,10 +1920,8 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			// max-wins semantics below.
 			if (currLight > 0)
 			{
-				// Carry the pre-LOS effective double (which can exceed 1.0 for blow-out)
-				// through, applying LOS attenuation as a proportional fraction. This
-				// preserves blow-out under smoke/wall attenuation while keeping the
-				// integer scalar track byte-identical to the legacy behaviour.
+				// Apply LOS attenuation as a proportional fraction of the pre-LOS
+				// effective double, so blow-out (effective > 1.0) survives smoke/wall decay.
 				const double losFraction = (currLightBeforeLos > 0)
 					? static_cast<double>(currLight) / currLightBeforeLos
 					: 0.0;

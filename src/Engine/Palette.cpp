@@ -28,7 +28,7 @@
 namespace
 {
 
-static inline int sqrDist(const SDL_Color &a, const SDL_Color &b)
+inline int sqrDist(const SDL_Color &a, const SDL_Color &b)
 {
 	int dr = (int)a.r - (int)b.r;
 	int dg = (int)a.g - (int)b.g;
@@ -39,7 +39,7 @@ static inline int sqrDist(const SDL_Color &a, const SDL_Color &b)
 // Iterates only [firstColor, lastColor] inclusive. Reserved slots (transparent index 0,
 // TFTD's reserved tail) must stay outside the search or near-black/near-tail tint targets
 // would map to them, producing transparent or wrong-colour pixels in tinted blits.
-static Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target, int firstColor, int lastColor)
+Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target, int firstColor, int lastColor)
 {
 	int best = firstColor;
 	int bestDist = sqrDist(colors[firstColor], target);

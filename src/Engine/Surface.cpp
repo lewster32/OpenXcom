@@ -964,14 +964,8 @@ void Surface::blitRaw(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSur
 }
 
 /**
- * Translucent static blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest].
- * Mirrors blitRaw but uses the BlendShade functor for translucent smoke rendering.
- * @param dest destination surface
- * @param src source surface (SurfaceRaw)
- * @param x x position
- * @param y y position
- * @param shade shade value
- * @param blendLUT 256x256 blend lookup table from Palette::getBlendLUT
+ * Translucent static blit for smoke rendering: applies shade to src then writes
+ * blendLUT[shadedSrc * 256 + dest]. blendLUT comes from Palette::getBlendLUT.
  */
 void Surface::blitRawBlend(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, const Uint8 *blendLUT)
 {
@@ -980,14 +974,8 @@ void Surface::blitRawBlend(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> s
 }
 
 /**
- * Emissive blit: every non-transparent pixel renders at the artist's authored value with no shade
- * modifier. Equivalent to blitRaw with shade=0 for all visible pixels. shade >= 16 still
- * hard-blacks the sprite for fog-of-war.
- * @param dest destination surface
- * @param src source surface (SurfaceRaw)
- * @param x x position
- * @param y y position
- * @param shade shade value; only values >= 16 (fog-of-war) have effect
+ * Emissive blit: every non-transparent pixel renders at the artist's authored value
+ * with no shade modifier. shade >= 16 still hard-blacks the sprite for fog-of-war.
  */
 void Surface::blitRawFullBright(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade)
 {
@@ -997,18 +985,12 @@ void Surface::blitRawFullBright(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uin
 
 /**
  * Additive-photon tint blit. Looks up tintLUT[shadedSrc * 4096 + gridIdx] for each
- * non-transparent source pixel. shade >= 16 applies fog-of-war darkening before the lookup.
- * @param dest destination surface
- * @param src source surface (SurfaceRaw)
- * @param x x position
- * @param y y position
- * @param shade shade value
- * @param gridIdx 12-bit packed grid index from Tile::getGridIdx(); 0 = pure black
- * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
+ * non-transparent source pixel. shade >= 16 applies fog-of-war darkening before
+ * the lookup. gridIdx is a 12-bit packed grid index from Tile::getGridIdx() (0 = pure black);
+ * tintLUT is the 256 * 4096 table from Palette::getTintLUT.
  */
 void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, bool half)
 {
-	const int unused = 0;
 	ShaderMove<const Uint8> src(srcSurf, x, y);
 	if (half)
 	{
@@ -1022,49 +1004,31 @@ void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> sr
 		src.setDomain(g);
 	}
 	helper::TintShadeParams p = {tintLUT, gridIdx};
-	ShaderDraw<helper::TintShade>(ShaderSurface(destSurf), src, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+	ShaderDraw<helper::TintShade>(ShaderSurface(destSurf), src, ShaderScalar(shade), ShaderScalar(p));
 }
 
 /**
- * Masked additive-photon tint blit. Same as blitRawTint but clips writes to range.
- * Used for unit sprites split across tile boundaries during walking.
- * @param dest destination surface
- * @param src source surface (SurfaceRaw)
- * @param x x position
- * @param y y position
- * @param shade shade value
- * @param gridIdx 12-bit packed grid index from Tile::getGridIdx()
- * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
- * @param range area that limits the draw surface
+ * Masked additive-photon tint blit. Same as the simpler overload but clips writes to
+ * range (used for unit sprites split across tile boundaries during walking).
  */
 void Surface::blitRawTint(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range)
 {
-	const int unused = 0;
 	ShaderMove<const Uint8> src(srcSurf, x, y);
 	ShaderMove<Uint8> dest(destSurf);
 	dest.setDomain(range);
 	helper::TintShadeParams p = {tintLUT, gridIdx};
-	ShaderDraw<helper::TintShade>(dest, src, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+	ShaderDraw<helper::TintShade>(dest, src, ShaderScalar(shade), ShaderScalar(p));
 }
 
 /**
  * Per-corner floor blit with bilinear interpolation of the 4 corner tint gridIdxs.
- * For each non-transparent pixel in the source surface, computes isometric (u,v) coordinates,
- * bilinearly interpolates between the 4 corner gridIdxs, quantises (with optional dithering
- * per Options::oxceBattleColourLightDither), then looks up tintLUT.
+ * For each non-transparent source pixel, bilinearly interpolates the corner gridIdxs
+ * (NW=0, NE=1, SW=2, SE=3) over the iso diamond, quantises (optionally dithered per
+ * Options::oxceBattleColourLightDither), then looks up tintLUT.
  *
- * Corner layout (NW=0, NE=1, SW=2, SE=3):
- *   u increases east, v increases south in screen space.
+ * Corner layout: u increases east, v increases south in screen space.
  *   ns = (u - v + 1) * 0.5   maps [south=0 .. north=1]
  *   nt = (u + v)     * 0.5   maps [west=0  .. east=1]
- *
- * @param dest destination surface
- * @param src source surface (SurfaceRaw)
- * @param x blit X position (screen coords)
- * @param y blit Y position (screen coords)
- * @param shade shade offset (same semantics as blitRaw)
- * @param gridNW/NE/SW/SE per-corner 12-bit packed gridIdxs from Tile::getGridIdx(corner)
- * @param tintLUT 256 * 4096 LUT from Palette::getTintLUT(mix)
  */
 void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf, int x, int y, int shade,
                                Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
@@ -1201,43 +1165,6 @@ void Surface::blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade, Gra
 	dest.setDomain(range);
 
 	ShaderDraw<helper::StandardShade>(dest, src, ShaderScalar(shade));
-}
-
-/**
- * Translucent blit: applies shade to src then writes blendLUT[shadedSrc * 256 + dest].
- * Used for translucent smoke rendering. Transparent when src == 0.
- * @param surface destination to blit to
- * @param x
- * @param y
- * @param shade shade offset applied to source
- * @param blendLUT 256x256 LUT from Palette::getBlendLUT
- */
-void Surface::blitNShadeBlend(SurfaceRaw<Uint8> surface, int x, int y, int shade, const Uint8 *blendLUT) const
-{
-	ShaderMove<const Uint8> src(this, x, y);
-	ShaderDraw<helper::BlendShade>(ShaderSurface(surface), src, ShaderScalar(shade), ShaderScalar(blendLUT));
-}
-
-void Surface::blitNShadeFullBright(SurfaceRaw<Uint8> surface, int x, int y, int shade) const
-{
-	blitRawFullBright(surface, SurfaceRaw<const Uint8>(this), x, y, shade);
-}
-
-void Surface::blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT) const
-{
-	blitRawTint(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridIdx, tintLUT);
-}
-
-void Surface::blitNShadeTint(SurfaceRaw<Uint8> surface, int x, int y, int shade, int gridIdx, const Uint8 *tintLUT, GraphSubset range) const
-{
-	blitRawTint(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridIdx, tintLUT, range);
-}
-
-void Surface::blitNShadeTintFloor(SurfaceRaw<Uint8> surface, int x, int y, int shade,
-                                  Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
-                                  const Uint8 *tintLUT) const
-{
-	blitRawTintFloor(surface, SurfaceRaw<const Uint8>(this), x, y, shade, gridNW, gridNE, gridSW, gridSE, tintLUT);
 }
 
 /**

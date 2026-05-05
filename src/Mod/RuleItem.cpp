@@ -1393,9 +1393,7 @@ void RuleItem::setModLightColor(int r, int g, int b)
 
 /**
  * Whether this item should be rendered fullbright (sprite at max shade, no tint LUT applied).
- * If the modder didn't set `fullBright`, fall back to the legacy auto-detect: BT_FLARE items
- * were always drawn fullbright. An explicit `fullBright: false` opts out, an explicit
- * `fullBright: true` opts in for any item type.
+ * Default: BT_FLARE emits. Modders override per-item via `fullBright: true/false`.
  */
 bool RuleItem::getFullBright() const
 {
@@ -1417,9 +1415,7 @@ bool RuleItem::isLitInstance(int itemId) const
 
 /**
  * Returns the centre brightness for the BattleItem-driven addLight call. Mod
- * override wins; otherwise the legacy-equivalent fallbackRange / 15.0 (which
- * matches the centre brightness produced by today's linear falloff at the
- * source tile).
+ * override wins; otherwise fallbackRange / 15.0.
  */
 double RuleItem::getEffectiveLightIntensity(int fallbackRange) const
 {

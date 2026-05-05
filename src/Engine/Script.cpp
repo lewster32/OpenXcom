@@ -687,9 +687,8 @@ void ScriptWorkerBlit::executeBlitTint(const Surface* src, Surface* dest, int x,
 	else
 	{
 		// No script: equivalent to blitRawTint.
-		const int unused = 0;
 		helper::TintShadeParams p = {tintLUT, gridIdx};
-		ShaderDraw<helper::TintShade>(destShader, srcShader, ShaderScalar(shade), ShaderScalar(p), ShaderScalar(unused));
+		ShaderDraw<helper::TintShade>(destShader, srcShader, ShaderScalar(shade), ShaderScalar(p));
 	}
 }
 

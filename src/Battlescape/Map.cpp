@@ -726,11 +726,7 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 			shade = getShadePulseForFrame(shade, _animFrame);
 		}
 	}
-	// Apply the perceptual gamma softening to the unit's shade only - tiles and
-	// items continue to render at the linear scalar so corpses, dropped items,
-	// and tile surfaces dim correctly with distance. The same tile that renders
-	// a corpse at shade 12 (dim) will render a unit standing on it at shade ~3
-	// at SCALAR_GAMMA = 0.1, which is the tactical-visibility-friendly default.
+	// Apply perceptual gamma to the unit shade only - tiles/items keep linear shading.
 	if (shade > 0 && shade < 15)
 	{
 		const double rawLight = (15.0 - shade) / 15.0;
@@ -743,14 +739,8 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 	}
 	if (tintLUT)
 	{
-		// A fullbright floor / object renders at shade 0 (max palette brightness)
-		// regardless of propagated light power, so a unit standing on top whose
-		// shade comes from the (often heuristically-reduced) lightSource value
-		// looks much darker than the surface beneath it. Cap the unit's shade
-		// when its tile has any fullbright part, so the unit visually matches
-		// the brightness of what it is standing on. The cap is a small non-zero
-		// value so units retain a touch of self-shading rather than going
-		// completely flat.
+		// Cap unit shade when its tile has any fullbright part so units do not look
+		// darker than the surface they stand on. Non-zero so units keep some self-shading.
 		constexpr int unitFullBrightShade = 2;
 		if (currTile)
 		{
@@ -764,10 +754,7 @@ void Map::drawUnit(UnitSprite &unitSprite, Tile *unitTile, Tile *currTile, Posit
 				shade = std::min(shade, unitFullBrightShade);
 			}
 		}
-		// Route unit sprite through the additive-photon tint pipeline so it is
-		// coloured by the light at the tile it is drawn over (currTile). Units do
-		// not get per-corner bilinear - use the averaged gridIdx regardless of the
-		// perCorner flag since the unit sprite footprint covers the whole diamond.
+		// Units use the averaged gridIdx, not per-corner: the sprite covers the whole diamond.
 		unitSprite.setTintLUT(tintLUT, currTile->getAvgGridIdx());
 	}
 	unitSprite.draw(bu, part, tileScreenPosition.x + offsets.ScreenOffset.x, tileScreenPosition.y + offsets.ScreenOffset.y, shade, mask, _isAltPressed && !_isCtrlPressed);
@@ -825,16 +812,10 @@ void Map::drawTerrain(Surface *surface)
 		}
 	}
 
-	// MASTER GATE: every coloured-lighting render path is keyed off
-	// oxceBattleRealisticLighting. When that option is off, tintLUT stays nullptr
-	// and perCorner is forced false, which makes every tinted/per-corner blit
-	// short-circuit to the vanilla blitRaw path - byte-identical to vanilla.
-	// Night vision (the OXCE hybrid system - _nvColor non-zero - and the debug
-	// brightness mode) replaces scene shading with a flat pass over a single palette
-	// row. Applying a colour-tint LUT on top defeats the NV effect entirely. Force
-	// tintLUT off and perCorner off when any NV mode is active so all blits fall
-	// through to the vanilla blitRaw path (which honours _nvColor) and NV behaves
-	// as designed.
+	// Coloured-lighting paths are gated on oxceBattleRealisticLighting; with it off,
+	// tintLUT stays null and tinted blits short-circuit to the vanilla blitRaw path.
+	// Night vision modes replace scene shading with a flat palette row, so the tint
+	// must also be disabled for them or the NV effect is defeated.
 	const bool nvActive = (_nvColor != 0) || (_debugVisionMode == 1);
 	const Uint8 *tintLUT = nullptr;
 	const bool perCorner = !nvActive && Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightPerCorner;

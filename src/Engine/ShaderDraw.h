@@ -283,7 +283,7 @@ struct TintShadeParams
  */
 struct TintShade
 {
-	static inline void func(Uint8& dest, const Uint8& src, const int& shade, const TintShadeParams& p, const int&)
+	static inline void func(Uint8& dest, const Uint8& src, const int& shade, const TintShadeParams& p)
 	{
 		if (src)
 		{

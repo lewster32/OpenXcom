@@ -685,9 +685,9 @@ public:
 	void setModLightColor(int r, int g, int b);
 	/// True iff a mod-supplied lightColor override has been recorded for this item.
 	bool hasModLightColor() const { return _hasModLightColor; }
-	/// True iff this item should be rendered fullbright (sprite at max shade, no tint LUT). Default: legacy auto-detect (BT_FLARE -> fullbright); modders override per-item via `fullBright: true/false` in item YAML.
+	/// True iff this item should be rendered fullbright (sprite at max shade, no tint LUT). Default: BT_FLARE; modders override per-item via `fullBright: true/false` in item YAML.
 	bool getFullBright() const;
-	/// Sets the fullBright override directly. v=-1 unset (legacy auto), 0 off, 1 on. Used by hot-reload paths to re-apply YAML state without going through full RuleItem::load().
+	/// Sets the fullBright override directly. v=-1 unset (auto from battle type), 0 off, 1 on. Used by hot-reload paths to re-apply YAML state without going through full RuleItem::load().
 	void setFullBright(int v) { _fullBright = v; }
 	/// Clears every mod-supplied lighting override on this RuleItem (modLightColor flag + values, fullBright tri-state). Used by Mod::reloadLightingRules() to wipe the slate before re-applying YAML.
 	void clearModLighting()
@@ -717,9 +717,8 @@ public:
 	/// through pick-up and drop.
 	bool isLitInstance(int itemId) const;
 	/// Effective intensity for the addLight call. Returns the mod override if set,
-	/// otherwise the legacy-equivalent fallbackRange / 15.0 (where fallbackRange is
-	/// typically the per-BattleItem getGlowRange() since RuleItem itself has no
-	/// inherent radius).
+	/// otherwise fallbackRange / 15.0 (where fallbackRange is typically the
+	/// per-BattleItem getGlowRange() since RuleItem itself has no inherent radius).
 	double getEffectiveLightIntensity(int fallbackRange) const;
 	/// Parses a nested `light:` block (color / radius / intensity / fullBright) from YAML
 	/// and applies the values to this rule. Shared between the main load path and

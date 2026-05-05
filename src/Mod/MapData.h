@@ -151,7 +151,9 @@ public:
 	void setModLightRadius(int value);
 	/// Sets the mod-supplied lightIntensity override (called from MCDPatch nested light block).
 	void setModLightIntensity(double value);
+	/// True iff a mod-supplied lightRadius override has been recorded.
 	bool hasModLightRadius() const { return _hasModLightRadius; }
+	/// True iff a mod-supplied lightIntensity override has been recorded.
 	bool hasModLightIntensity() const { return _hasModLightIntensity; }
 	/// Effective radius used by TileEngine::addLight. Returns the mod override if set, otherwise the resolved lightSource (vanilla or mod) value.
 	int getEffectiveLightRadius() const;
@@ -178,7 +180,7 @@ public:
 	void setLightColor(int r, int g, int b);
 	/// Sets the mod-supplied lightColour override (called from MCDPatch).
 	void setModLightColor(int r, int g, int b);
-	/// True iff this part should be rendered fullbright (sprite at max shade, no tint LUT). Default: legacy auto-detect from getLightSource() > 0; modders override per-part via `fullBright: true/false` in MCDPatch.
+	/// True iff this part should be rendered fullbright (sprite at max shade, no tint LUT). Default: any part with getLightSource() > 0; modders override per-part via `fullBright: true/false` in MCDPatch.
 	bool getFullBright() const;
 	/// Sets the fullBright override (called from MCDPatch). v=-1 unset, 0 off, 1 on.
 	void setFullBright(int v) { _fullBright = v; }
