@@ -34,14 +34,32 @@ namespace LightingHash
 // (current in-game-tuned default for tactical visibility).
 constexpr double SCALAR_GAMMA = 0.1;
 
-// Boost-style hash combiner. Same inputs always yield the same output;
-// outputs are uniformly distributed across the 32-bit range for the
-// small-integer inputs we feed in (tile coords + part index, or a
-// BattleItem id padded with zeros). Used to make the per-source
-// litChance roll deterministic for the duration of a battle.
+// Boost-style per-step hash combiner. Each step folds one int into the
+// running state. Note: the boost combiner alone has weak avalanche on the
+// later inputs (the last small-int folded in only flips a few bits in the
+// output), which is fine for std::hash composition where the LAST step is
+// hashed-by-someone-else, but disastrous for our use case (we feed 3-4
+// small consecutive integers and read raw bits). Always finish with fmix32
+// before calling passes() - mix() does this for you.
 inline std::uint32_t mixStep(std::uint32_t h, int v)
 {
     h ^= static_cast<std::uint32_t>(v) + 0x9E3779B9u + (h << 6) + (h >> 2);
+    return h;
+}
+
+// Murmur3 fmix32 - finalizer that avalanches every input bit across all
+// output bits. Five ops, branch-free, deterministic. Prevents stacked rooms
+// at the same (x, y, part) from all rolling the same way for the same
+// litChance: without this, mix() returns near-identical values for adjacent
+// z and the bottom-24-bit roll in passes() ends up correlated >99% across
+// z levels.
+inline std::uint32_t fmix32(std::uint32_t h)
+{
+    h ^= h >> 16;
+    h *= 0x85EBCA6Bu;
+    h ^= h >> 13;
+    h *= 0xC2B2AE35u;
+    h ^= h >> 16;
     return h;
 }
 
@@ -52,7 +70,7 @@ inline std::uint32_t mix(int a, int b, int c, int d)
     h = mixStep(h, b);
     h = mixStep(h, c);
     h = mixStep(h, d);
-    return h;
+    return fmix32(h);
 }
 
 // Returns true if a source with this litChance should be considered lit

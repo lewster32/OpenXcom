@@ -57,8 +57,8 @@ constexpr double LIGHT_FALLOFF_K = 0.05;
 
 // Hardcoded centre-brightness for light types that do not expose
 // modder-tunable per-source intensity fields.
-constexpr double FIRE_LIGHT_INTENSITY = 1.0;
-constexpr double PERSONAL_LIGHT_INTENSITY = 1.0;
+constexpr double FIRE_LIGHT_INTENSITY = 0.6;
+constexpr double PERSONAL_LIGHT_INTENSITY = 0.8;
 
 // Inverse-square clamped falloff:
 //   raw(x)         = 1 / (1 + k * x^2)
@@ -1633,15 +1633,26 @@ void TileEngine::bloomLighting()
 
 /**
  * For every shared world-vertex, takes the per-channel per-layer MAX across all
- * (up to 4) tile corners that share that vertex, then writes it back to all of
- * them. This prevents the per-corner bilinear floor blit from seeing
- * discontinuous values at tile boundaries and producing hairline seams.
+ * (up to 4) tile corners that share that vertex, then writes it back. Walls
+ * gate the reconciliation: refs are first grouped into connected components
+ * (orthogonal neighbours that are NOT separated by a horizontalBlockage), and
+ * MAX-then-write is applied within each component independently. This stops
+ * a lit tile (e.g. a wall tile that took a direct hit from a nearby light)
+ * from promoting its corner brightness onto the dark neighbour on the far
+ * side of a wall - which is what produced the visible "fringe behind walls"
+ * in earlier builds.
  *
- * Vertex (vx, vy) is shared by:
- *   tile (vx,   vy  ) corner 0 (NW)
- *   tile (vx-1, vy  ) corner 1 (NE)
- *   tile (vx,   vy-1) corner 2 (SW)
- *   tile (vx-1, vy-1) corner 3 (SE)
+ * Spatial layout around vertex (vx, vy):
+ *   NW=tile (vx-1, vy-1) corner SE(3)  |  NE=tile (vx,   vy-1) corner SW(2)
+ *   ------------------------------------+------------------------------------
+ *   SW=tile (vx-1, vy  ) corner NE(1)  |  SE=tile (vx,   vy  ) corner NW(0)
+ *
+ * Edges form a 4-cycle: NW-NE, NE-SE, SE-SW, SW-NW. Diagonals (NW-SE, NE-SW)
+ * share only the vertex; union-find connects them transitively if a clear
+ * orthogonal path exists. A tile sealed off by walls on every shared edge
+ * becomes a singleton component and is left alone (its corner keeps the
+ * original addLight value rather than getting MAX-promoted across a wall).
+ *
  * Map-edge tiles hold fewer references and are skipped by the bounds check.
  *
  * Only meaningful in per-corner mode; finaliseTintPass gates the call, but this
@@ -1655,44 +1666,73 @@ void TileEngine::stitchVertices()
 	const int sy = _save->getMapSizeY();
 	const int sz = _save->getMapSizeZ();
 
+	// Edges of the 4-cycle around the vertex, ordered NW(0) NE(1) SW(2) SE(3).
+	static const int edges[4][2] = { { 0, 1 }, { 1, 3 }, { 3, 2 }, { 2, 0 } };
+
 	for (int z = 0; z < sz; ++z)
 	{
 		for (int vy = 0; vy <= sy; ++vy)
 		{
 			for (int vx = 0; vx <= sx; ++vx)
 			{
-				// The 4 (tile, corner) pairs that share this world-vertex.
+				// refs[i] = { tileX, tileY, corner } in NW, NE, SW, SE order.
 				const int refs[4][3] = {
-					{ vx,     vy,     0 }, // NW corner of tile (vx,   vy  )
-					{ vx - 1, vy,     1 }, // NE corner of tile (vx-1, vy  )
-					{ vx,     vy - 1, 2 }, // SW corner of tile (vx,   vy-1)
-					{ vx - 1, vy - 1, 3 }, // SE corner of tile (vx-1, vy-1)
+					{ vx - 1, vy - 1, 3 }, // NW tile, SE corner
+					{ vx,     vy - 1, 2 }, // NE tile, SW corner
+					{ vx - 1, vy,     1 }, // SW tile, NE corner
+					{ vx,     vy,     0 }, // SE tile, NW corner
 				};
+				Tile *tiles[4] = { nullptr, nullptr, nullptr, nullptr };
+				for (int i = 0; i < 4; ++i)
+				{
+					int tx = refs[i][0], ty = refs[i][1];
+					if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
+					tiles[i] = _save->getTile(Position(tx, ty, z));
+				}
+
+				// Union-find: two refs are in the same component if their tiles
+				// are orthogonally adjacent and no wall blocks between them.
+				// Geometry is layer-independent so the unions are done once.
+				int parent[4] = { 0, 1, 2, 3 };
+				auto find = [&](int x) {
+					while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+					return x;
+				};
+				for (int e = 0; e < 4; ++e)
+				{
+					int a = edges[e][0], b = edges[e][1];
+					if (!tiles[a] || !tiles[b]) continue;
+					if (horizontalBlockage(tiles[a], tiles[b], DT_NONE) > 0) continue;
+					int ra = find(a), rb = find(b);
+					if (ra != rb) parent[ra] = rb;
+				}
+
 				for (int layer = 0; layer < LL_MAX; ++layer)
 				{
-					int maxR = 0, maxG = 0, maxB = 0, count = 0;
+					// Per-component MAX. Indexed by root id (which is one of 0..3).
+					int maxR[4] = { 0, 0, 0, 0 };
+					int maxG[4] = { 0, 0, 0, 0 };
+					int maxB[4] = { 0, 0, 0, 0 };
+					int count[4] = { 0, 0, 0, 0 };
 					for (int i = 0; i < 4; ++i)
 					{
-						int tx = refs[i][0], ty = refs[i][1], c = refs[i][2];
-						if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
-						Tile *t = _save->getTile(Position(tx, ty, z));
-						if (!t) continue;
-						int r = t->getAccumR(layer, c);
-						int g = t->getAccumG(layer, c);
-						int b = t->getAccumB(layer, c);
-						if (r > maxR) maxR = r;
-						if (g > maxG) maxG = g;
-						if (b > maxB) maxB = b;
-						++count;
+						if (!tiles[i]) continue;
+						int c = refs[i][2];
+						int r = tiles[i]->getAccumR(layer, c);
+						int g = tiles[i]->getAccumG(layer, c);
+						int b = tiles[i]->getAccumB(layer, c);
+						int root = find(i);
+						if (r > maxR[root]) maxR[root] = r;
+						if (g > maxG[root]) maxG[root] = g;
+						if (b > maxB[root]) maxB[root] = b;
+						++count[root];
 					}
-					if (count <= 1) continue;
 					for (int i = 0; i < 4; ++i)
 					{
-						int tx = refs[i][0], ty = refs[i][1], c = refs[i][2];
-						if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
-						Tile *t = _save->getTile(Position(tx, ty, z));
-						if (!t) continue;
-						t->setAccumRGB(maxR, maxG, maxB, layer, c);
+						if (!tiles[i]) continue;
+						int root = find(i);
+						if (count[root] <= 1) continue; // singleton -> nothing to stitch
+						tiles[i]->setAccumRGB(maxR[root], maxG[root], maxB[root], layer, refs[i][2]);
 					}
 				}
 			}
