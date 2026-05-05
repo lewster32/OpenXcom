@@ -1100,8 +1100,17 @@ void Map::drawTerrain(Surface *surface)
 							const int wWShade = tile->getObstacle(O_WESTWALL) ? obstacleShade : wallShade;
 							if (tintLUT)
 							{
-								const int wallWGridIdx = tile->getAvgGridIdx();
-								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, wallWGridIdx, tintLUT);
+								if (perCorner)
+								{
+									// Per-corner wall: NW = left endpoint, SW = right endpoint.
+									Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade,
+										tile->getGridIdx(0), tile->getGridIdx(2), tintLUT);
+								}
+								else
+								{
+									const int wallWGridIdx = tile->getAvgGridIdx();
+									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade, wallWGridIdx, tintLUT);
+								}
 							}
 							else
 							{
