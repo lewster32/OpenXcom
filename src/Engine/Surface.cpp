@@ -1134,30 +1134,42 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 }
 
 /**
- * Per-corner wall blit: 1D linear interpolation between gridLeft and gridRight
- * along sprite-x. Mirrors blitRawTintFloor's per-row TintDither + per-pixel
- * tintLUT sampling but with a single 1D parameter instead of bilinear over the
- * isometric diamond. Used by north and west walls when oxceBattleColourLightPerCorner
- * is enabled; objects and units stay on the averaged blitRawTint path.
+ * Per-corner wall blit: 1D linear interpolation between gridStart (at sprite-x = xStart)
+ * and gridEnd (at sprite-x = xEnd). Pixels outside [xStart, xEnd] clamp to the nearest
+ * endpoint colour, so wall sprites that bleed slightly past their canonical half-domain
+ * (perspective overhang, decorations) still receive a sensible tint.
  *
- * half=true skips the left half of the source so a north wall does not overwrite
- * a same-tile west wall at the upper-left corner. The interpolation domain stays
- * [0, srcW]; only the iteration range is restricted.
+ * Mirrors blitRawTintFloor's per-row TintDither + per-pixel tintLUT sampling but with a
+ * single 1D parameter instead of bilinear over the isometric diamond. Used by north and
+ * west walls when oxceBattleColourLightPerCorner is enabled; objects and units stay on
+ * the averaged blitRawTint path.
+ *
+ * Caller chooses xStart/xEnd to match the wall's visible half:
+ *   north wall: xStart=srcW/2 (NW corner of diamond),  xEnd=srcW   (NE corner)
+ *   west wall:  xStart=0      (SW corner of diamond),  xEnd=srcW/2 (NW corner)
+ *
+ * half=true skips the left half of the source so a north wall does not overwrite a
+ * same-tile west wall at the upper-left corner. Has no effect on the gradient domain.
  */
 void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf,
                               int x, int y, int shade,
-                              Uint16 gridLeft, Uint16 gridRight,
+                              int xStart, int xEnd,
+                              Uint16 gridStart, Uint16 gridEnd,
                               const Uint8 *tintLUT, bool half)
 {
 	// Unpack endpoints into 4-bit (0..15) per-channel values.
-	const int lR = (gridLeft  >> 8) & 0xF, lG = (gridLeft  >> 4) & 0xF, lB = gridLeft  & 0xF;
-	const int rR = (gridRight >> 8) & 0xF, rG = (gridRight >> 4) & 0xF, rB = gridRight & 0xF;
+	const int sR = (gridStart >> 8) & 0xF, sG = (gridStart >> 4) & 0xF, sB = gridStart & 0xF;
+	const int eR = (gridEnd   >> 8) & 0xF, eG = (gridEnd   >> 4) & 0xF, eB = gridEnd   & 0xF;
 
 	const int srcW = srcSurf.getWidth();
 	const int srcH = srcSurf.getHeight();
 	const int destW = destSurf.getWidth();
 	const int destH = destSurf.getHeight();
 	if (srcW <= 0 || srcH <= 0) return;
+
+	// Guard against caller passing a degenerate or inverted domain.
+	const int xSpan = xEnd - xStart;
+	if (xSpan <= 0) return;
 
 	// Fixed-point arithmetic (16-bit fraction) so the inner loop avoids floats.
 	const int FP = 65536;
@@ -1171,30 +1183,32 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
 	const int destPitch = destSurf.getPitch();
 	Uint8 *destBuf = destSurf.getBuffer();
 
-	// half=true: skip the left half of the source. The interpolation domain
-	// remains [0, srcW] so the right-half pixels still sample from the correct
-	// slice of the gradient.
-	const int xStart = half ? srcW / 2 : 0;
+	// half=true: skip the left half of the source so a north wall does not overdraw
+	// a same-tile west wall at the upper-left corner. The interpolation domain is
+	// independent of this clip; clipped pixels are simply not written.
+	const int pxStart = half ? srcW / 2 : 0;
 
 	for (int py = 0; py < srcH; ++py)
 	{
 		dither.beginRow(py);
 
 		const Uint8 *srcRow = srcBuf + py * srcPitch;
-		for (int px = xStart; px < srcW; ++px)
+		for (int px = pxStart; px < srcW; ++px)
 		{
 			const Uint8 src = srcRow[px];
 			if (!src) continue;
 
-			// 1D linear interp parameter: t = 0 at left edge, t = FP at right edge.
-			const int t = (px * FP + FP / 2) / srcW;
+			// 1D linear interp parameter: clamped to [0, FP] so pixels outside
+			// the gradient domain settle on the nearest endpoint.
+			int t = ((px - xStart) * FP + xSpan / 2) / xSpan;
+			if (t < 0) t = 0; else if (t > FP) t = FP;
 
 			// Linear interpolation; result keeps 4 extra bits of fraction for
 			// dithering. Final scale [0..240] (= 0..15 * 16). Mirrors the floor
 			// blit's quantisation idiom.
-			const int r16 = (rR * t + lR * (FP - t)) >> (16 - 4);
-			const int g16 = (rG * t + lG * (FP - t)) >> (16 - 4);
-			const int b16 = (rB * t + lB * (FP - t)) >> (16 - 4);
+			const int r16 = (eR * t + sR * (FP - t)) >> (16 - 4);
+			const int g16 = (eG * t + sG * (FP - t)) >> (16 - 4);
+			const int b16 = (eB * t + sB * (FP - t)) >> (16 - 4);
 
 			// 4-bit-fraction in [0..240] -> clamped 4-bit out [0..15].
 			int r, g, b;

@@ -327,9 +327,10 @@ public:
 	static void blitRawTintFloor(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade,
 	                             Uint16 gridNW, Uint16 gridNE, Uint16 gridSW, Uint16 gridSE,
 	                             const Uint8 *tintLUT);
-	/// Per-corner wall blit: 1D linear interpolation between gridLeft (sprite-x = 0) and gridRight (sprite-x = srcW). Reuses TintDither + tintLUT sampling. half=true clips the source's left half (mirrors blitRaw's flag, used for north walls overlapping a same-tile west wall at the upper-left corner).
+	/// Per-corner wall blit: 1D linear interpolation between gridStart (at sprite-x = xStart) and gridEnd (at sprite-x = xEnd). Pixels outside [xStart, xEnd] clamp to the nearest endpoint colour. xStart and xEnd are chosen by the caller to match the wall's visible half of the sprite (north walls: srcW/2..srcW; west walls: 0..srcW/2). Reuses TintDither + tintLUT sampling. half=true clips the source's left half (mirrors blitRaw's flag, used for north walls overlapping a same-tile west wall at the upper-left corner).
 	static void blitRawTintWall(SurfaceRaw<Uint8> dest, SurfaceRaw<const Uint8> src, int x, int y, int shade,
-	                            Uint16 gridLeft, Uint16 gridRight,
+	                            int xStart, int xEnd,
+	                            Uint16 gridStart, Uint16 gridEnd,
 	                            const Uint8 *tintLUT, bool half = false);
 	/// Specific blit function to blit battlescape terrain data in different shades in a fast way.
 	void blitNShade(SurfaceRaw<Uint8> surface, int x, int y, int shade = 0, bool half = false, int newBaseColor = 0) const;

@@ -1102,9 +1102,15 @@ void Map::drawTerrain(Surface *surface)
 							{
 								if (perCorner)
 								{
-									// Per-corner wall: NW = left endpoint, SW = right endpoint.
+									// West wall lives in sprite-x [0, srcW/2]: SW corner at the
+									// left edge (sprite-x = 0), NW corner at the diamond's top
+									// vertex (sprite-x = srcW/2). Pixels past the midline (slight
+									// perspective bleed, decorations) clamp to the NW endpoint.
+									const int srcW = tmpSurface.getWidth();
 									Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wWShade,
-										tile->getGridIdx(0), tile->getGridIdx(2), tintLUT);
+										0, srcW / 2,
+										tile->getGridIdx(2), tile->getGridIdx(0),
+										tintLUT);
 								}
 								else
 								{
@@ -1126,8 +1132,25 @@ void Map::drawTerrain(Surface *surface)
 							const bool clipForWestWall = bool(tile->getSprite(O_WESTWALL));
 							if (tintLUT)
 							{
-								const int wallNGridIdx = tile->getAvgGridIdx();
-								Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT, clipForWestWall);
+								if (perCorner)
+								{
+									// North wall lives in sprite-x [srcW/2, srcW]: NW corner at the
+									// diamond's top vertex (sprite-x = srcW/2), NE corner at the
+									// right edge (sprite-x = srcW). Pixels before the midline (slight
+									// perspective bleed) clamp to the NW endpoint. clipForWestWall
+									// forwards the half-clip flag so the upper-left half is skipped
+									// when the same tile already drew a west wall.
+									const int srcW = tmpSurface.getWidth();
+									Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade,
+										srcW / 2, srcW,
+										tile->getGridIdx(0), tile->getGridIdx(1),
+										tintLUT, clipForWestWall);
+								}
+								else
+								{
+									const int wallNGridIdx = tile->getAvgGridIdx();
+									Surface::blitRawTint(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wNShade, wallNGridIdx, tintLUT, clipForWestWall);
+								}
 							}
 							else
 							{
