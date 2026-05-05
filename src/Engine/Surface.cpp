@@ -1134,6 +1134,100 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 }
 
 /**
+ * Per-corner wall blit: 1D linear interpolation between gridLeft and gridRight
+ * along sprite-x. Mirrors blitRawTintFloor's per-row TintDither + per-pixel
+ * tintLUT sampling but with a single 1D parameter instead of bilinear over the
+ * isometric diamond. Used by north and west walls when oxceBattleColourLightPerCorner
+ * is enabled; objects and units stay on the averaged blitRawTint path.
+ *
+ * half=true skips the left half of the source so a north wall does not overwrite
+ * a same-tile west wall at the upper-left corner. The interpolation domain stays
+ * [0, srcW]; only the iteration range is restricted.
+ */
+void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8> srcSurf,
+                              int x, int y, int shade,
+                              Uint16 gridLeft, Uint16 gridRight,
+                              const Uint8 *tintLUT, bool half)
+{
+	// Unpack endpoints into 4-bit (0..15) per-channel values.
+	const int lR = (gridLeft  >> 8) & 0xF, lG = (gridLeft  >> 4) & 0xF, lB = gridLeft  & 0xF;
+	const int rR = (gridRight >> 8) & 0xF, rG = (gridRight >> 4) & 0xF, rB = gridRight & 0xF;
+
+	const int srcW = srcSurf.getWidth();
+	const int srcH = srcSurf.getHeight();
+	const int destW = destSurf.getWidth();
+	const int destH = destSurf.getHeight();
+	if (srcW <= 0 || srcH <= 0) return;
+
+	// Fixed-point arithmetic (16-bit fraction) so the inner loop avoids floats.
+	const int FP = 65536;
+
+	// Per-row dithering identical to blitRawTintFloor so wall and floor banding
+	// behaviour stay aligned for users.
+	TintDither dither(Options::oxceBattleColourLightDither, srcW);
+
+	const int srcPitch = srcSurf.getPitch();
+	const Uint8 *srcBuf = srcSurf.getBuffer();
+	const int destPitch = destSurf.getPitch();
+	Uint8 *destBuf = destSurf.getBuffer();
+
+	// half=true: skip the left half of the source. The interpolation domain
+	// remains [0, srcW] so the right-half pixels still sample from the correct
+	// slice of the gradient.
+	const int xStart = half ? srcW / 2 : 0;
+
+	for (int py = 0; py < srcH; ++py)
+	{
+		dither.beginRow(py);
+
+		const Uint8 *srcRow = srcBuf + py * srcPitch;
+		for (int px = xStart; px < srcW; ++px)
+		{
+			const Uint8 src = srcRow[px];
+			if (!src) continue;
+
+			// 1D linear interp parameter: t = 0 at left edge, t = FP at right edge.
+			const int t = (px * FP + FP / 2) / srcW;
+
+			// Linear interpolation; result keeps 4 extra bits of fraction for
+			// dithering. Final scale [0..240] (= 0..15 * 16). Mirrors the floor
+			// blit's quantisation idiom.
+			const int r16 = (rR * t + lR * (FP - t)) >> (16 - 4);
+			const int g16 = (rG * t + lG * (FP - t)) >> (16 - 4);
+			const int b16 = (rB * t + lB * (FP - t)) >> (16 - 4);
+
+			// 4-bit-fraction in [0..240] -> clamped 4-bit out [0..15].
+			int r, g, b;
+			dither.quantise(px, r16, g16, b16, r, g, b);
+			const int interpGridIdx = (r << 8) | (g << 4) | b;
+
+			const int sx = x + px;
+			const int sy = y + py;
+			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH) continue;
+
+			// Pure additive: skip the shade-darkens-source step; the LUT encodes
+			// src * light so dim light naturally gives a dim result. Only honour
+			// shade when it signals fog-of-war (shade >= 16).
+			Uint8 shaded;
+			if (shade >= 16)
+			{
+				const Uint8 newShade = (src & helper::ColorShade) + (Uint8)shade;
+				if (newShade & helper::ColorGroup)
+					shaded = helper::ColorShade;
+				else
+					shaded = (src & helper::ColorGroup) | newShade;
+			}
+			else
+			{
+				shaded = src;
+			}
+			destBuf[sy * destPitch + sx] = tintLUT[(int)shaded * 4096 + interpGridIdx];
+		}
+		dither.endRow();
+	}
+}
+
+/**
  * Specific blit function to blit battlescape terrain data in different shades in a fast way.
  * Notice there is no surface locking here - you have to make sure you lock the surface yourself
  * at the start of blitting and unlock it when done.
