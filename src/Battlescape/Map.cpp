@@ -1201,6 +1201,22 @@ void Map::drawTerrain(Surface *surface)
 								{
 									Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade);
 								}
+								else if (perCorner && objDataBack && objDataBack->getBigWall() == Pathfinding::BIGWALLNESW)
+								{
+									// NESW diagonal wall: SW corner at sprite-x = 0 (diamond's screen-left vertex),
+									// NE corner at sprite-x = srcW (screen-right vertex). Full-width horizontal gradient,
+									// mirrors the existing N/W wall pattern but with the full sprite-x domain since
+									// the wall's running axis spans the entire diamond width.
+									const int srcW = tmpSurface.getWidth();
+									const Uint16 gSW = tile->getGridIdx(2), gNE = tile->getGridIdx(1);
+									if (objBackShade < 16 && gSW == 0xFFF && gNE == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), 0);
+									else
+										Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objBackShade,
+											0, srcW,
+											gSW, gNE,
+											tintLUT);
+								}
 								else
 								{
 									// Saturated grid (0xFFF) + shade<16 -> blitRaw with shade=0 by LUT design (cell 0xFFF is identity, mirroring the natural unlit sprite).
@@ -1528,6 +1544,22 @@ void Map::drawTerrain(Surface *surface)
 								else if (objFrontEmissive)
 								{
 									Surface::blitRawFullBright(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade);
+								}
+								else if (perCorner && objDataFront && objDataFront->getBigWall() == Pathfinding::BIGWALLNESW)
+								{
+									// NESW diagonal wall: SW corner at sprite-x = 0 (diamond's screen-left vertex),
+									// NE corner at sprite-x = srcW (screen-right vertex). Full-width horizontal gradient,
+									// mirrors the existing N/W wall pattern but with the full sprite-x domain since
+									// the wall's running axis spans the entire diamond width.
+									const int srcW = tmpSurface.getWidth();
+									const Uint16 gSW = tile->getGridIdx(2), gNE = tile->getGridIdx(1);
+									if (objFrontShade < 16 && gSW == 0xFFF && gNE == 0xFFF)
+										Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), 0);
+									else
+										Surface::blitRawTintWall(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_OBJECT), objFrontShade,
+											0, srcW,
+											gSW, gNE,
+											tintLUT);
 								}
 								else
 								{
