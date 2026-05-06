@@ -27,6 +27,7 @@
 #include "ModScript.h"
 #include "RuleResearch.h"
 #include "RuleBaseFacilityFunctions.h"
+#include "../Battlescape/Position.h"
 
 namespace OpenXcom
 {
@@ -485,6 +486,7 @@ private:
 	double _lightIntensity;
 	bool _hasLightIntensity;
 	double _litChance;
+	Position _lightOffset; // mod-supplied sub-tile light source offset in voxels (delta from natural centre); (0,0,0) = no shift
 	std::vector<int> _customItemPreviewIndex;
 	int _kneelBonus, _oneHandedPenalty;
 	int _monthlySalary, _monthlyMaintenance;
@@ -700,6 +702,7 @@ public:
 		_hasLightIntensity = false;
 		_lightIntensity = 0.0;
 		_litChance = 1.0;
+		_lightOffset = Position(0, 0, 0);
 	}
 	/// True iff this RuleItem set an explicit light radius override.
 	bool hasLightRadius() const { return _hasLightRadius; }
@@ -711,6 +714,8 @@ public:
 	double getLightIntensity() const { return _lightIntensity; }
 	/// Returns the per-item litChance. Default 1.0 (always lit). Set via light.litChance in YAML.
 	double getLitChance() const { return _litChance; }
+	/// Returns the per-item sub-tile light offset in voxels. (0,0,0) = no shift. Set via light.offset in YAML.
+	Position getLightOffset() const { return _lightOffset; }
 	/// Returns true if a BattleItem with this ruleset should emit light /
 	/// render fullBright. Hashes on `itemId` (BattleItem::getId()) so the
 	/// roll is stable for the duration of the battle and follows the item

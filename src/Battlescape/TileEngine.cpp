@@ -1118,6 +1118,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			int currLight = 0;
 			double winIntensity = 0.0;
 			int winR = 255, winG = 255, winB = 255;
+			Position winOffset(0, 0, 0);
 
 			for (const auto* bi : *tile->getInventory())
 			{
@@ -1129,6 +1130,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 						currLight = glowRange;
 						winIntensity = bi->getRules()->getEffectiveLightIntensity(glowRange);
 						bi->getRules()->getLightColor(winR, winG, winB);
+						winOffset = bi->getRules()->getLightOffset();
 					}
 				}
 
@@ -1138,6 +1140,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 					currLight = unitFireLightPowerStunned;
 					winIntensity = FIRE_LIGHT_INTENSITY;
 					_save->getMod()->getFireLightColor(winR, winG, winB);
+					winOffset = Position(0, 0, 0);
 				}
 			}
 
@@ -1145,7 +1148,7 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_ITEMS, winR, winG, winB);
+			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_ITEMS, winR, winG, winB, false, winOffset);
 		}
 	);
 }
@@ -1166,6 +1169,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		double winIntensity = 0.0;
 		int winR = 255, winG = 255, winB = 255;
 		bool winBypassLOS = false;
+		Position winOffset(0, 0, 0);
 
 		// Personal armour light: respects LOS when realistic lighting is on (so torches no longer wrap around walls), otherwise bypasses for vanilla wrap-around behaviour.
 		auto tryPersonalLight = [&](int personalPower)
@@ -1176,6 +1180,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 				winIntensity = PERSONAL_LIGHT_INTENSITY;
 				_save->getMod()->getPersonalLightColor(winR, winG, winB);
 				winBypassLOS = !Options::oxceBattleRealisticLighting;
+				winOffset = Position(0, 0, 0);
 			}
 		};
 
@@ -1207,6 +1212,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 					winIntensity = w->getRules()->getEffectiveLightIntensity(glowRange);
 					w->getRules()->getLightColor(winR, winG, winB);
 					winBypassLOS = !Options::oxceBattleRealisticLighting;
+					winOffset = w->getRules()->getLightOffset();
 				}
 			}
 
@@ -1217,6 +1223,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 				winIntensity = FIRE_LIGHT_INTENSITY;
 				_save->getMod()->getFireLightColor(winR, winG, winB);
 				winBypassLOS = false;
+				winOffset = Position(0, 0, 0);
 			}
 		}
 		// add lighting of units on fire
@@ -1226,6 +1233,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 			winIntensity = FIRE_LIGHT_INTENSITY;
 			_save->getMod()->getFireLightColor(winR, winG, winB);
 			winBypassLOS = false;
+			winOffset = Position(0, 0, 0);
 		}
 
 		if (currLight >= getMaxDynamicLightDistance())
@@ -1247,7 +1255,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-				addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS);
+				addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS, winOffset);
 			}
 		}
 	}
@@ -1751,7 +1759,13 @@ void TileEngine::recalculateLighting()
  * @param lightR/G/B   Light source colour in 0-255 per channel.
  * @param bypassLOS    If true and oxceBattleRealisticLighting is off, light
  *                     wraps around walls (vanilla flashlight behaviour).
- * @param lightOffset  Optional sub-tile offset of the source position.
+ * @param lightOffset  Optional sub-tile offset of the source position, in voxels, applied as a
+ *                     delta from the natural source centre. The LOS trace works on a coarser grid
+ *                     of `divide` voxels per step (8 for LL_FIRE, 4 for LL_ITEMS / LL_UNITS), so
+ *                     offsets smaller than `divide` round to zero. Offsets approaching half a tile
+ *                     can push the source into a neighbour tile and cause the LOS trace to start
+ *                     from the wrong cell - if you want the light to emanate from a wall surface,
+ *                     prefer the MCDPatch on the wall tile itself rather than a large offset.
  */
 void TileEngine::addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
                           int lightR, int lightG, int lightB,
@@ -1769,10 +1783,10 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 	const auto tileHeight = _save->getTile(center)->getTerrainLevel();
 	const auto divide = (fire ? 8 : 4);
 	const auto accuracy = TileEngine::voxelTileSize / divide;
-	const bool hasExplicitOffset = (lightOffset.x != 0 || lightOffset.y != 0 || lightOffset.z != 0);
-	const auto offsetCenter = hasExplicitOffset
-	    ? (lightOffset / divide)
-	    : (accuracy / 2 + Position(-1, -1, (ground ? 0 : accuracy.z/4) - tileHeight * accuracy.z / 24));
+	// Natural source centre (in accuracy units): mid-tile in xy plus a terrain-level / waist-height bias.
+	// Mod-supplied lightOffset is a voxel-space delta; divide it once to land in the same units.
+	const auto naturalCentre = accuracy / 2 + Position(-1, -1, (ground ? 0 : accuracy.z/4) - tileHeight * accuracy.z / 24);
+	const auto offsetCenter = naturalCentre + (lightOffset / divide);
 	const auto offsetTarget = (accuracy / 2 + Position(-1, -1, 0));
 	// oxceBattleRealisticLighting forces LOS-traced propagation for all light sources
 	// regardless of the mod's `lighting: { enhanced: N }` bitmask or the caller's

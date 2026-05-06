@@ -199,6 +199,7 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_lightRadius(0), _hasLightRadius(false),
 	_lightIntensity(0.0), _hasLightIntensity(false),
 	_litChance(1.0),
+	_lightOffset(0, 0, 0),
 	_kneelBonus(-1), _oneHandedPenalty(-1),
 	_monthlySalary(0), _monthlyMaintenance(0),
 	_sprayWaypoints(0)
@@ -1464,6 +1465,14 @@ void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
 		if (litChance < 0.0) litChance = 0.0;
 		if (litChance > 1.0) litChance = 1.0;
 		_litChance = litChance;
+	}
+	if (lightNode["offset"])
+	{
+		// Sub-tile light source offset in voxels, applied as a delta from the natural source centre
+		// in TileEngine::addLight(). Sequence form [x, y, z] only; map form silently ignored.
+		std::vector<int> offset = lightNode["offset"].readVal<std::vector<int> >();
+		if (offset.size() == 3)
+			_lightOffset = Position(offset[0], offset[1], offset[2]);
 	}
 }
 
