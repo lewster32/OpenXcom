@@ -3178,10 +3178,36 @@ inline void BattlescapeState::handle(Action *action)
 								line << partNames[p] << ": " << dsName << " #" << mapDataID
 									 << " (lightSource=" << ls
 									 << ", lightColor=" << colorHex
-									 << ", fullBright=" << (md->getFullBright() ? "true" : "false") << ")";
+									 << ", fullBright=" << (md->getFullBright() ? "true" : "false")
+									 << ", bigwall=" << md->getBigWall() << ")";
 								Log(LOG_INFO) << "  " << line.str();
 								summary << " | " << dsName << "#" << mapDataID;
 							}
+							// Per-corner accumulated coloured-light gridIdx values (12-bit packed RRRRGGGGBBBB,
+							// 4 bits per channel = 0..15 levels). NW=0, NE=1, SW=2, SE=3. Use this to compare
+							// adjacent tiles' shared corners: tile A's NE should equal tile B's NW for tiles
+							// laid out east-west, etc. Disagreement at shared corners is the cause of visible
+							// per-tile banding under per-corner colour lighting.
+							const char* cornerNames[4] = { "NW", "NE", "SW", "SE" };
+							std::ostringstream gridLine;
+							gridLine << "  gridIdx[4]:";
+							for (int c = 0; c < 4; ++c)
+							{
+								Uint16 g = cursorTile->getGridIdx(c);
+								int gR = (g >> 8) & 0xF;
+								int gG = (g >> 4) & 0xF;
+								int gB = g & 0xF;
+								gridLine << " " << cornerNames[c] << "=R" << std::setw(2) << std::setfill('0') << gR
+								         << "G" << std::setw(2) << std::setfill('0') << gG
+								         << "B" << std::setw(2) << std::setfill('0') << gB
+								         << "(0x" << std::hex << std::setw(3) << std::setfill('0') << g << std::dec << ")";
+							}
+							Log(LOG_INFO) << gridLine.str();
+							// Legacy per-layer scalar light intensities (no colour, for context only).
+							Log(LOG_INFO) << "  lightLayers: AMBIENT=" << cursorTile->getLight(LL_AMBIENT)
+							              << " FIRE=" << cursorTile->getLight(LL_FIRE)
+							              << " ITEMS=" << cursorTile->getLight(LL_ITEMS)
+							              << " UNITS=" << cursorTile->getLight(LL_UNITS);
 							debug(summary.str());
 						}
 					}
