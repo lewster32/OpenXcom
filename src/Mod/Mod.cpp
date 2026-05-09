@@ -5593,8 +5593,10 @@ void Mod::loadVanillaResources()
 		{ 3, 3, 6, 255 } };
 		for (size_t i = 0; i < ARRAYLEN(gradient); ++i)
 		{
-			SDL_Color *color = _palettes[s2]->getColors(Palette::backPos + 16 + i);
-			*color = gradient[i];
+			// Route through setColor instead of writing through getColors() so the
+			// palette's lazy OKLab cache invalidates correctly. Gradient values are
+			// all non-zero so setColor's index-zero disambiguation does not engage.
+			_palettes[s2]->setColor(Palette::backPos + 16 + i, gradient[i].r, gradient[i].g, gradient[i].b);
 		}
 		//_palettes[s2]->savePalMod("../../../customPalettes.rul", "PAL_BATTLESCAPE_CUSTOM", "PAL_BATTLESCAPE");
 	}

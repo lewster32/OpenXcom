@@ -19,6 +19,7 @@
  */
 #include <string>
 #include <map>
+#include <vector>
 #include <SDL.h>
 
 namespace OpenXcom
@@ -40,6 +41,11 @@ private:
 	int _lastUsableColor;  ///< Last palette index (inclusive) that nearestIndex may return (defaults to 255). TFTD battlescape palettes set this to 254 to skip the reserved tail slot.
 	std::map<int, Uint8*> _blendLUTs;
 	std::map<int, Uint8*> _tintLUTs; ///< Keyed on mix; each LUT is 256 * 4096 bytes (4-bit per-channel grid).
+	/// Pre-converted OKLab triples [L, a, b] interleaved, one per palette entry. Built lazily on first
+	/// nearestIndexOKLab call after _colors becomes valid; cleared whenever _colors is mutated. ~3 KB per palette.
+	mutable std::vector<float> _oklab;
+	/// Lazily populates _oklab from _colors. Idempotent. Called from nearestIndexOKLab.
+	void ensureOKLabCache() const;
 public:
 	/// Creates a blank palette.
 	Palette();
@@ -78,6 +84,9 @@ public:
 	/// is the 4-bit-per-channel bit-packed quantised RGB accumulator (12 bits total).
 	/// Cached per mix value; built lazily.
 	const Uint8 *getTintLUT(int mix);
+	/// Returns a pointer to the lazily-built OKLab cache (3 floats per palette entry: L, a, b).
+	/// Triggers ensureOKLabCache(). Used by the OKLab nearest-search in getTintLUT.
+	const float *getOKLabCache() const { ensureOKLabCache(); return _oklab.data(); }
 	/// Converts a given color into a RGBA color value.
 	static Uint32 getRGBA(SDL_Color* pal, Uint8 color);
 	/// Gets the position of a given palette.

@@ -19,6 +19,8 @@
 #include "Palette.h"
 #include <sstream>
 #include <vector>
+#include <cmath>
+#include <limits>
 #include "CrossPlatform.h"
 #include "Exception.h"
 #include "FileMap.h"
@@ -46,6 +48,70 @@ Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target, int firstCo
 	for (int i = firstColor + 1; i <= lastColor; ++i)
 	{
 		int d = sqrDist(colors[i], target);
+		if (d < bestDist)
+		{
+			bestDist = d;
+			best = i;
+		}
+	}
+	return (Uint8)best;
+}
+
+// sRGB byte [0..255] -> linear [0..1]. Standard sRGB curve, piecewise linear below
+// 0.04045 and gamma 2.4 above. Used to convert palette and cell-RGB into linear-light
+// space before multiplication, then re-encoded for nearest-palette search.
+inline double srgbToLinear(int c)
+{
+	double f = c / 255.0;
+	return f <= 0.04045 ? f / 12.92 : std::pow((f + 0.055) / 1.055, 2.4);
+}
+
+// Linear [0..1] -> sRGB byte [0..255]. Inverse of srgbToLinear with rounded byte
+// output and clamps at the extremes.
+inline int linearToSrgb(double c)
+{
+	if (c <= 0.0) return 0;
+	if (c >= 1.0) return 255;
+	double f = c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1.0 / 2.4) - 0.055;
+	return (int)std::lround(f * 255.0);
+}
+
+// sRGB byte triple -> OKLab triple. See https://bottosson.github.io/posts/oklab/
+// Better than CIELAB in the blue region and cheap (one cbrt per channel). Output L
+// is in [0..1]-ish; a/b are small-magnitude signed floats.
+inline void rgbToOKLab(int r, int g, int b, float &L, float &A, float &B)
+{
+	double lr = srgbToLinear(r);
+	double lg = srgbToLinear(g);
+	double lb = srgbToLinear(b);
+	double l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+	double m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+	double s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+	double lc = std::cbrt(l);
+	double mc = std::cbrt(m);
+	double sc = std::cbrt(s);
+	L = (float)( 0.2104542553 * lc + 0.7936177850 * mc - 0.0040720468 * sc);
+	A = (float)( 1.9779984951 * lc - 2.4285922050 * mc + 0.4505937099 * sc);
+	B = (float)( 0.0259040371 * lc + 0.7827717662 * mc - 0.8086757660 * sc);
+}
+
+// Search-by-OKLab-distance restricted to [firstColor, lastColor]. Mirrors
+// nearestIndex's reserved-slot exclusion. Uses the lazy OKLab cache attached to
+// the palette so per-entry conversion runs once per palette load, not per LUT cell.
+Uint8 nearestIndexOKLab(const OpenXcom::Palette &pal, int targetR, int targetG, int targetB,
+	int firstColor, int lastColor)
+{
+	const float *lab = pal.getOKLabCache();
+	float tL, tA, tB;
+	rgbToOKLab(targetR, targetG, targetB, tL, tA, tB);
+	int best = firstColor;
+	float bestDist = std::numeric_limits<float>::infinity();
+	for (int i = firstColor; i <= lastColor; ++i)
+	{
+		float dL = lab[i * 3]     - tL;
+		float dA = lab[i * 3 + 1] - tA;
+		float dB = lab[i * 3 + 2] - tB;
+		float d = dL * dL + dA * dA + dB * dB;
 		if (d < bestDist)
 		{
 			bestDist = d;
@@ -279,10 +345,29 @@ const Uint8 *Palette::getBlendLUT(int opacity)
 	return lut;
 }
 
+void Palette::ensureOKLabCache() const
+{
+	if (!_oklab.empty()) return;
+	_oklab.resize(_count * 3);
+	for (int i = 0; i < _count; ++i)
+	{
+		float L, A, B;
+		rgbToOKLab(_colors[i].r, _colors[i].g, _colors[i].b, L, A, B);
+		_oklab[i * 3]     = L;
+		_oklab[i * 3 + 1] = A;
+		_oklab[i * 3 + 2] = B;
+	}
+}
+
 /**
  * Returns a 256 by 4096 tint LUT for the given mix value (0..100). Cached per mix.
  * Each entry maps (shadedSrc, 12-bit-packed grid index) to the nearest palette colour
  * for the additive-photon tint pipeline. Allocates 1 MB per cached mix.
+ *
+ * The bg * cellRGB multiply runs in linear-light space (sRGB decode -> multiply ->
+ * sRGB encode) and the nearest-palette search uses OKLab perceptual distance. Both
+ * eliminate distinct classes of banding/hue-shift artefacts in coloured-light
+ * gradients. See docs/superpowers/specs/2026-05-08-perceptual-palette-snap-design.md.
  */
 const Uint8 *Palette::getTintLUT(int mix)
 {
@@ -299,6 +384,11 @@ const Uint8 *Palette::getTintLUT(int mix)
 	Uint8 *lut = new Uint8[256 * cells];
 	for (int src = 0; src < 256; ++src)
 	{
+		// Hoist src's linear decode out of the cell loop - it's invariant across all 4096 cells.
+		double srLin = srgbToLinear(_colors[src].r);
+		double sgLin = srgbToLinear(_colors[src].g);
+		double sbLin = srgbToLinear(_colors[src].b);
+
 		for (int cell = 0; cell < cells; ++cell)
 		{
 			// Unpack the cell index into per-channel quantised values.
@@ -321,13 +411,18 @@ const Uint8 *Palette::getTintLUT(int mix)
 			int effG = 255 - mix * (255 - gG) / 100;
 			int effB = 255 - mix * (255 - gB) / 100;
 
-			// Apply as multiply on source palette colour.
-			SDL_Color target;
-			target.r = (Uint8)(_colors[src].r * effR / 255);
-			target.g = (Uint8)(_colors[src].g * effG / 255);
-			target.b = (Uint8)(_colors[src].b * effB / 255);
+			// Multiply in linear-light space, then re-encode to sRGB bytes.
+			double cRLin = srgbToLinear(effR);
+			double cGLin = srgbToLinear(effG);
+			double cBLin = srgbToLinear(effB);
 
-			lut[src * cells + cell] = nearestIndex(_colors, target, _firstUsableColor, _lastUsableColor);
+			SDL_Color target;
+			target.r = (Uint8)linearToSrgb(srLin * cRLin);
+			target.g = (Uint8)linearToSrgb(sgLin * cGLin);
+			target.b = (Uint8)linearToSrgb(sbLin * cBLin);
+
+			lut[src * cells + cell] = nearestIndexOKLab(*this, target.r, target.g, target.b,
+				_firstUsableColor, _lastUsableColor);
 		}
 	}
 	_tintLUTs[mix] = lut;
@@ -428,6 +523,7 @@ void Palette::setColors(SDL_Color* pal, int ncolors)
 		}
 	}
 	_colors[0].unused = 0;
+	_oklab.clear();
 }
 
 void Palette::setColor(int index, int r, int g, int b)
@@ -447,6 +543,7 @@ void Palette::setColor(int index, int r, int g, int b)
 		_colors[index].g++;
 		_colors[index].b++;
 	}
+	_oklab.clear();
 }
 
 void Palette::copyColor(int index, int r, int g, int b)
@@ -454,6 +551,7 @@ void Palette::copyColor(int index, int r, int g, int b)
 	_colors[index].r = r;
 	_colors[index].g = g;
 	_colors[index].b = b;
+	_oklab.clear();
 }
 
 }
