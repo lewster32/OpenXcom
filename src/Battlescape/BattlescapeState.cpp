@@ -3128,16 +3128,16 @@ inline void BattlescapeState::handle(Action *action)
 					{
 						saveAIMap();
 					}
-					// REMOVE_BEFORE_RELEASE: F10 = hot-reload lighting rules + force lighting recalc.
+					// REMOVE_BEFORE_RELEASE: Ctrl+L = hot-reload lighting rules + force lighting recalc.
 					// Coloured-lighting development aid only; ship-blocked. Grep REMOVE_BEFORE_RELEASE before tagging a release.
-					else if (key == SDLK_F10)
+					else if (_save->getDebugMode() && key == SDLK_l && ctrlPressed)
 					{
 						_game->getMod()->reloadLightingRules();
 						_save->getTileEngine()->recalculateLighting();
 						_map->invalidate();
 						debug("Lighting rules reloaded.");
 					}
-					// END REMOVE_BEFORE_RELEASE (F10)
+					// END REMOVE_BEFORE_RELEASE (Ctrl+L)
 
 					// REMOVE_BEFORE_RELEASE: F8 = dump MCD info for the tile under the cursor.
 					// Coloured-lighting development aid only; ship-blocked. Grep REMOVE_BEFORE_RELEASE before tagging a release.
@@ -3145,7 +3145,7 @@ inline void BattlescapeState::handle(Action *action)
 					// to the runtime log, plus a one-line summary on the debug overlay. Lets you
 					// pick a glowing prop in-game and see the exact `type:` / `MCDIndex:` you need
 					// for an MCDPatches entry without having to grep the MCD files.
-					else if (key == SDLK_F8 && !altPressed)
+					else if (_save->getDebugMode() && key == SDLK_F8 && !altPressed)
 					{
 						Position cursorPos;
 						_map->getSelectorPosition(&cursorPos);
