@@ -1,0 +1,185 @@
+items:
+  - type: STR_ELECTRO_FLARE
+    light: { color: "#f7a409", intensity: 1.2, radius: 15 }
+
+MCDPatches:
+  - type: ROADS
+    data:
+      # Street lamp
+      - { MCDIndex: 16, light: { color: "#dba24b", intensity: 1.6, radius: 15, litChance: 0.95, fullBright: false } }
+      # Phone box
+      - { MCDIndex: 21, light: { color: "#b5dff0", intensity: 0.7, radius: 4, fullBright: false, litChance: 0.7 } }
+  - type: URBAN
+    data:
+      # Pillar
+      - { MCDIndex: 72, light: { color: "#a6cfc6", intensity: 0.5, radius: 8, fullBright: false, litChance: 0.75 } }
+      # Gas pump
+      - { MCDIndex: 81, light: { color: "#a6cdcf", intensity: 0.7, radius: 8, fullBright: false } }
+  - type: FRNITURE
+    data:
+      # Table
+      - { MCDIndex: 0, light: { color: "#c0b86f", intensity: 0.9, radius: 8, fullBright: false, litChance: 0.4 } }
+      # Desk lamp
+      - { MCDIndex: 4, light: { color: "#ff9a17", intensity: 0.7, radius: 8, fullBright: false, litChance: 0.5 } }
+      # Reading lamp
+      - { MCDIndex: 10, light: { color: "#ffd20b", intensity: 0.5, radius: 15, fullBright: true, litChance: 0.5 } }
+      # Sink
+      - { MCDIndex: 13, light: { color: "#a6cdcf", intensity: 0.7, radius: 15, fullBright: false, litChance: 0.6 } }
+  - type: U_BASE
+    data:
+      # Alien tank #1
+      - { MCDIndex: 10, light: { color: "#ca982b", source: 5, fullBright: false } }
+      - { MCDIndex: 11, light: { color: "#ca982b", source: 5, fullBright: false } }
+      - { MCDIndex: 12, light: { color: "#ca982b", source: 5, fullBright: false } }
+      - { MCDIndex: 13, light: { color: "#ca982b", source: 6, fullBright: false } }
+      # Alien tank #2
+      - { MCDIndex: 14, light: { color: "#078841", source: 5, fullBright: false } }
+      - { MCDIndex: 15, light: { color: "#078841", source: 5, fullBright: false } }
+      - { MCDIndex: 16, light: { color: "#078841", source: 5, fullBright: false } }
+      - { MCDIndex: 17, light: { color: "#078841", source: 6, fullBright: false } }
+      # Alien tank #3
+      - { MCDIndex: 18, light: { color: "#4f83be", source: 5, fullBright: false } }
+      - { MCDIndex: 19, light: { color: "#4f83be", source: 5, fullBright: false } }
+      - { MCDIndex: 20, light: { color: "#4f83be", source: 5, fullBright: false } }
+      - { MCDIndex: 21, light: { color: "#4f83be", source: 6, fullBright: false } }
+      # Alien tank #4
+      - { MCDIndex: 24, light: { color: "#9b7475", source: 2, fullBright: false } }
+      # Alien plant #1
+      - { MCDIndex: 40, light: { color: "#c040a0", intensity: 1, radius: 3, fullBright: true, litChance: 0.8 } }
+      - { MCDIndex: 41, light: { color: "#bc40c0", intensity: 1, radius: 3, fullBright: true, litChance: 0.8 } }
+      - { MCDIndex: 42, light: { color: "#c04086", intensity: 1, radius: 3, fullBright: true, litChance: 0.8 } }
+      - { MCDIndex: 43, light: { color: "#a640c0", intensity: 1, radius: 3, fullBright: true, litChance: 0.8 } }
+      # Exit tile
+      - { MCDIndex: 62, light: { color: "#2d853c", source: 3, fullBright: true } }
+  - type: U_PODS
+    data:
+      # UFO fuel pod #1
+      - { MCDIndex: 0, light: { color: "#bb3a4b", intensity: 0.8, radius: 1, fullBright: true, litChance: 0.5 } }
+      # UFO fuel pod #2
+      - { MCDIndex: 1, light: { color: "#bb3a4b", intensity: 0.8, radius: 1, fullBright: true, litChance: 0.5 } }
+      # UFO pod
+      - { MCDIndex: 2, light: { color: "#f5a9a9", source: 8, fullBright: true } }
+      # Alien entertainment #1
+      - { MCDIndex: 3, light: { color: "#e6c71c", intensity: 1.2, radius: 10, fullBright: true, litChance: 0.6 } }
+      - { MCDIndex: 4, light: { color: "#e6c71c", intensity: 1.2, radius: 10, fullBright: true, litChance: 0.6 } }
+      # Alien entertainment #2
+      - { MCDIndex: 7, light: { color: "#1c7ae6", intensity: 1.2, radius: 10, fullBright: true, litChance: 0.6 } }
+      - { MCDIndex: 8, light: { color: "#1c7ae6", intensity: 1.2, radius: 10, fullBright: true, litChance: 0.6 } }
+  - type: AVENGER
+    data:
+      # Engine pods
+      - { MCDIndex: 20, light: { color: "#a341a5", intensity: 1, radius: 4, fullBright: true } }
+      # Floor
+      - { MCDIndex: 34, light: { color: "#d0d1b5", intensity: 0.7, radius: 5, fullBright: true } }
+      - { MCDIndex: 35, light: { color: "#d0d1b5", source: 1, fullBright: true } }
+      - { MCDIndex: 36, light: { color: "#d0d1b5", source: 1, fullBright: true } }
+      - { MCDIndex: 37, light: { color: "#d0d1b5", source: 1, fullBright: true } }
+      - { MCDIndex: 38, light: { color: "#d0d1b5", source: 1, fullBright: true } }
+      # Ramp
+      - { MCDIndex: 53, light: { color: "#880a0a", intensity: 0.3, radius: 3, fullBright: false } }
+      - { MCDIndex: 54, light: { color: "#880a0a", intensity: 0.5, radius: 3, fullBright: false } }
+      - { MCDIndex: 55, light: { color: "#880a0a", intensity: 0.3, radius: 3, fullBright: false } }
+      # Front light
+      - { MCDIndex: 10, light: { color: "#d6c100", intensity: 0.6, radius: 12, fullBright: false } }
+  - type: PLANE
+    data:
+      # Floor
+      - { MCDIndex: 2, light: { color: "#d0d1b5", source: 5, fullBright: true } }
+      # Ramp
+      - { MCDIndex: 62, light: { color: "#d0d1b5", source: 5, fullBright: false } }
+      - { MCDIndex: 63, light: { color: "#d0d1b5", source: 5, fullBright: false } }
+      - { MCDIndex: 64, light: { color: "#d0d1b5", source: 5, fullBright: false } }
+  - type: LIGHTNIN
+    data:
+      # Floor
+      - { MCDIndex: 21, light: { color: "#d0d1b5", intensity: 0.2, radius: 2, fullBright: false } }
+      # Engine
+      - { MCDIndex: 42, light: { color: "#d88415", source: 10, fullBright: true } }
+      # Ramp
+      - { MCDIndex: 38, light: { color: "#880a0a", intensity: 0.5, radius: 3, fullBright: false } }
+      - { MCDIndex: 39, light: { color: "#880a0a", intensity: 0.5, radius: 3, fullBright: false } }
+      # Feet
+      - { MCDIndex: 15, light: { color: "#ffa32b", source: 10, fullBright: false } }
+      - { MCDIndex: 16, light: { color: "#ffa32b", source: 10, fullBright: false } }
+  - type: XBASE1
+    data:
+      # Base floor tile #1
+      - { MCDIndex: 6, light: { color: "#d3c7c4", source: 3, fullBright: false } }
+      # Base floor tile #2
+      - { MCDIndex: 9, light: { color: "#dcdcdc", source: 3, fullBright: false } }
+  - type: MARS
+    data:
+      # Exit tile
+      - { MCDIndex: 33, light: { color: "#2d853c", source: 3, fullBright: true } }
+  - type: U_WALL02
+    data:
+      # Lift
+      - { MCDIndex: 12, light: { color: "#9e1c1c", intensity: 0.7, radius: 3, fullBright: true } }
+      - { MCDIndex: 13, light: { color: "#f59e2d", intensity: 0.9, radius: 2, fullBright: false } }
+      # Alien entertainment #1
+      - { MCDIndex: 15, light: { color: "#c044a5", source: 3, fullBright: true } }
+      # Alien entertainment #2
+      - { MCDIndex: 26, light: { color: "#c044a5", source: 5, fullBright: true } }
+      # Console
+      - { MCDIndex: 35, light: { color: "#c044a5", intensity: 1, radius: 5, fullBright: false } }
+      # Power source
+      - { MCDIndex: 45, light: { color: "#ff950b", intensity: 1.2, radius: 1, fullBright: true } }
+      # Monitors
+      - { MCDIndex: 31, light: { color: "#0d7903", source: 5, fullBright: false } }
+      - { MCDIndex: 32, light: { color: "#0d7903", source: 5, fullBright: false } }
+  - type: UFO1
+    data:
+      # Lift
+      - { MCDIndex: 9, light: { color: "#b469a4", source: 8, fullBright: true } }
+  - type: U_DISEC2
+    data:
+      # Dissectors
+      - { MCDIndex: 15, light: { color: "#128fc0", source: 5, fullBright: false } }
+      - { MCDIndex: 16, light: { color: "#128fc0", source: 5, fullBright: false } }
+  - type: BRAIN
+    data:
+      # Brain
+      - { MCDIndex: 0, light: { color: "#5cdb12", intensity: 1, radius: 4, fullBright: false } }
+      - { MCDIndex: 1, light: { color: "#81bd5f", intensity: 1, radius: 4, fullBright: false } }
+      - { MCDIndex: 2, light: { color: "#377c0f", intensity: 1, radius: 4, fullBright: false } }
+      - { MCDIndex: 3, light: { color: "#8adf2a", intensity: 1, radius: 4, fullBright: false } }
+
+# Ambient RGB by mission shade (0=noon, 15=deepest night).
+ambientLightByShade:
+  - { shade: 0, rgb: "#ffffff" }
+  - { shade: 1, rgb: "#ffffff" }
+  - { shade: 2, rgb: "#ffffff" }
+  - { shade: 3, rgb: "#ffffff" }
+  - { shade: 4, rgb: "#ffffff" }
+  - { shade: 5, rgb: "#e2cc9f" }
+  - { shade: 6, rgb: "#ddc987" }
+  - { shade: 7, rgb: "#daa160" }
+  - { shade: 8, rgb: "#ce8a5c" }
+  - { shade: 9, rgb: "#d87e54" }
+  - { shade: 10, rgb: "#7b8cd8" }
+  - { shade: 11, rgb: "#3d4f9b" }
+  - { shade: 12, rgb: "#2c3b7a" }
+  - { shade: 13, rgb: "#1b275c" }
+  - { shade: 14, rgb: "#05031a" }
+  - { shade: 15, rgb: "#02010c" }
+
+alienDeployments:
+  - type: STR_ALIEN_BASE_ASSAULT
+    ambientLightByShade:
+      - { shade: 0, rgb: "#03130e" }
+      - { shade: 15, rgb: "#03130e" }
+  - type: STR_BASE_DEFENSE
+    ambientLightByShade:
+      - { shade: 0, rgb: "#cbcca9" }
+      - { shade: 15, rgb: "#cbcca9" }
+  - type: STR_MARS_CYDONIA_LANDING
+    ambientLightByShade:
+      - { shade: 0, rgb: "#381b07" }
+      - { shade: 15, rgb: "#381b07" }
+  - type: STR_MARS_THE_FINAL_ASSAULT
+    ambientLightByShade:
+      - { shade: 0, rgb: "#381b07" }
+      - { shade: 15, rgb: "#381b07" }
+
+personalLightColor: "#ffffff"   # soldier's flashlight glow
+fireLightColor: "#e76021"   # fire - used for both burning tiles AND units on fire

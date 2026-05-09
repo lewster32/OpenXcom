@@ -1,0 +1,231 @@
+items:
+  - type: STR_CHEMICAL_FLARE
+    light: { color: "#91ff00" }
+
+MCDPatches:
+  - type: ISLAND1
+    data:
+      # Bar
+      - { MCDIndex: 35, light: { color: "#e6ce4a", source: 7, fullBright: false } }
+      # Desk lamp
+      - { MCDIndex: 45, light: { color: "#daba64", intensity: 1, radius: 5, fullBright: false, litChance: 0.5 } }
+      # Table
+      - { MCDIndex: 49, light: { color: "#c9ba78", source: 12, fullBright: false } }
+  - type: PORT01
+    data:
+      # Door
+      - { MCDIndex: 56, light: { color: "#cfa971", intensity: 0.2, radius: 2, fullBright: false, litChance: 0.4 } }
+      # Checkpoint kiosk
+      - { MCDIndex: 34, light: { color: "#cfcd71", intensity: 0.7, radius: 10, fullBright: false, litChance: 0.4 } }
+  - type: PORT02
+    data:
+      # Chair
+      - { MCDIndex: 64, light: { color: "#e9ab26", intensity: 0.6, radius: 3, fullBright: false, litChance: 0.6 } }
+      # Table
+      - { MCDIndex: 66, light: { color: "#9ad6d6", intensity: 0.6, radius: 6, fullBright: false, litChance: 0.4 } }
+      # Filing cabinet
+      - { MCDIndex: 68, light: { color: "#c9ba78", intensity: 0.5, radius: 8, fullBright: false, litChance: 0.4 } }
+  - type: UINT1
+    data:
+      # Lift floor
+      - { MCDIndex: 15, light: { color: "#c59717", source: 5, fullBright: false } }
+      # Glowing crystal
+      - { MCDIndex: 37, light: { color: "#d2dd3b", source: 8, fullBright: true } }
+  - type: UINT2
+    data:
+      # Consoles
+      - { MCDIndex: 4, light: { color: "#10b382", source: 5, fullBright: false } }
+      - { MCDIndex: 5, light: { color: "#77e0db", source: 10, fullBright: false } }
+      - { MCDIndex: 7, light: { color: "#da613c", source: 15, fullBright: false } }
+      - { MCDIndex: 8, light: { color: "#e4513d", source: 4, fullBright: false } }
+      - { MCDIndex: 9, light: { color: "#77e0db", source: 10, fullBright: false } }
+  - type: UINT3
+    data:
+      # Lift
+      - { MCDIndex: 8, light: { color: "#10b382", source: 10, fullBright: true } }
+  - type: UEXT3
+    data:
+      # Windows
+      - { MCDIndex: 4, light: { color: "#e4af3d", intensity: 0.9, radius: 10, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 8, light: { color: "#e4af3d", intensity: 0.9, radius: 10, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 9, light: { color: "#e4af3d", intensity: 0.9, radius: 10, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 10, light: { color: "#e4af3d", intensity: 0.9, radius: 10, fullBright: false, litChance: 0.5 } }
+  - type: CARGO2
+    data:
+      # Lift
+      - { MCDIndex: 0, light: { color: "#c0c0c0", source: 10, fullBright: true } }
+      # Doors
+      - { MCDIndex: 2, light: { color: "#d3d48f", source: 8, fullBright: false } }
+      - { MCDIndex: 3, light: { color: "#d3d48f", source: 8, fullBright: false } }
+      - { MCDIndex: 4, light: { color: "#d3d48f", source: 8, fullBright: false } }
+      - { MCDIndex: 5, light: { color: "#d3d48f", source: 8, fullBright: false } }
+  - type: LINERA
+    data:
+      # Hull
+      - { MCDIndex: 3, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 4, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 5, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 6, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 7, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 12, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      - { MCDIndex: 13, light: { color: "#2e7bd3", source: 10, fullBright: false } }
+      # Bed
+      - { MCDIndex: 56, light: { color: "#e2e1b4", intensity: 1, radius: 5, fullBright: false, litChance: 0.5 } }
+      # Coridoor
+      - { MCDIndex: 62, light: { color: "#885c2a", intensity: 0.6, radius: 3, fullBright: false, litChance: 0.5 } }
+      # Wall lamp
+      - { MCDIndex: 70, light: { color: "#dfb631", intensity: 1, radius: 3, fullBright: false, litChance: 0.8 } }
+      - { MCDIndex: 74, light: { color: "#dfb631", intensity: 1, radius: 3, fullBright: false, litChance: 0.8 } }
+      # Table
+      - { MCDIndex: 76, light: { color: "#ceba8e", intensity: 0.6, radius: 5, fullBright: true, litChance: 0.8 } }
+      # Bridge
+      - { MCDIndex: 86, light: { color: "#ff0000", intensity: 0.8, radius: 5, fullBright: false } }
+  - type: LINERC
+    data:
+      # Oven
+      - { MCDIndex: 13, light: { color: "#8ecece", source: 10, fullBright: true } }
+      # Bar
+      - { MCDIndex: 32, light: { color: "#ceba8e", source: 10, fullBright: true } }
+      - { MCDIndex: 33, light: { color: "#ceba8e", source: 10, fullBright: true } }
+  - type: LINERD
+    data:
+      # Office
+      - { MCDIndex: 8, light: { color: "#8ecece", intensity: 0.4, radius: 5, fullBright: false, litChance: 0.5 } }
+  - type: DECKC
+    data:
+      # Gambling table
+      - { MCDIndex: 8, light: { color: "#ceba8e", source: 5, fullBright: true } }
+      - { MCDIndex: 9, light: { color: "#ceba8e", source: 5, fullBright: true } }
+  - type: XBITS
+    data:
+      # Table
+      - { MCDIndex: 2, light: { color: "#a8dbeb", source: 14, fullBright: true } }
+      # Oven
+      - { MCDIndex: 4, light: { color: "#a8dbeb", source: 14, fullBright: true } }
+      # Bar
+      - { MCDIndex: 24, light: { color: "#ebe1a8", source: 10, fullBright: true } }
+  - type: TRITON
+    data:
+      # Floor
+      - { MCDIndex: 2, light: { color: "#d6c8a9", intensity: 0.4, radius: 3, fullBright: true } }
+      # Nose
+      - { MCDIndex: 21, light: { color: "#d6c8a9", intensity: 0.8, radius: 10, fullBright: false } }
+  - type: HAMMER
+    data:
+      # Floor
+      - { MCDIndex: 4, light: { color: "#d6c8a9", intensity: 0.4, radius: 3, fullBright: true } }
+      # Nose
+      - { MCDIndex: 27, light: { color: "#d6c8a9", intensity: 0.8, radius: 10, fullBright: false } }
+  - type: LEVIATH
+    data:
+      # Front lights
+      - { MCDIndex: 32, light: { color: "#66d1d1", intensity: 0.8, radius: 10, fullBright: false } }
+      # Floor
+      - { MCDIndex: 12, light: { color: "#dd3333", intensity: 0.4, radius: 3, fullBright: false } }
+  - type: PYRAMID
+    data:
+      # Lift
+      - { MCDIndex: 18, light: { color: "#2cade0", source: 10, fullBright: true } }
+      # Exit
+      - { MCDIndex: 19, light: { color: "#eeff00", source: 4, fullBright: true } }
+      # Teal floor
+      - { MCDIndex: 15, light: { color: "#00ffaa", source: 4, fullBright: true } }
+      - { MCDIndex: 16, light: { color: "#00ffaa", source: 4, fullBright: true } }
+      # Pink floor
+      - { MCDIndex: 17, light: { color: "#c475ac", source: 4, fullBright: true } }
+  - type: PIPES
+    data:
+      # Window
+      - { MCDIndex: 3, light: { color: "#e0d42c", intensity: 0.6, radius: 5, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 6, light: { color: "#e0d42c", intensity: 0.6, radius: 5, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 12, light: { color: "#e0d42c", intensity: 0.6, radius: 5, fullBright: false, litChance: 0.5 } }
+      - { MCDIndex: 15, light: { color: "#e0d42c", intensity: 0.6, radius: 5, fullBright: false, litChance: 0.5 } }
+      # Workstation
+      - { MCDIndex: 25, light: { color: "#b64625", intensity: 1, radius: 5, fullBright: true, litChance: 0.5 } }
+      # Chair
+      - { MCDIndex: 30, light: { color: "#2ab625", intensity: 0.7, radius: 5, fullBright: false, litChance: 0.4 } }
+      # Lamp
+      - { MCDIndex: 48, light: { color: "#2cc5e0", intensity: 1.2, radius: 10, fullBright: true, litChance: 0.9 } }
+  - type: VOLC
+    data:
+      # Vent
+      - { MCDIndex: 15, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 16, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      # Lava flows
+      - { MCDIndex: 18, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 37, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 79, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 24, light: { color: "#b64625", intensity: 0.5, radius: 5, fullBright: false } }
+      - { MCDIndex: 25, light: { color: "#b64625", intensity: 0.5, radius: 5, fullBright: false } }
+      - { MCDIndex: 27, light: { color: "#b64625", intensity: 0.5, radius: 5, fullBright: false } }
+      # Eruption
+      - { MCDIndex: 33, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 34, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 57, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      # Big lava flow
+      - { MCDIndex: 35, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: true } }
+      - { MCDIndex: 36, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: true } }
+      - { MCDIndex: 38, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+      - { MCDIndex: 39, light: { color: "#b64625", intensity: 1, radius: 3, fullBright: false } }
+
+  - type: ENTRY
+    data:
+      # Entry
+      - { MCDIndex: 8, light: { color: "#2cbce0", source: 5, fullBright: true } }
+      - { MCDIndex: 9, light: { color: "#e0d42c", source: 5, fullBright: true } }
+  - type: ORGANIC1
+    data:
+      # Blue orb
+      - { MCDIndex: 13, light: { color: "#2c4de0", source: 13, fullBright: true } }
+      - { MCDIndex: 53, light: { color: "#7dbfcf", source: 9, fullBright: true } }
+      - { MCDIndex: 54, light: { color: "#339458", source: 9, fullBright: true } }
+      # Lift top
+      - { MCDIndex: 91, light: { color: "#2ce0d7", source: 10, fullBright: true } }
+  - type: ORGANIC2
+    data:
+      # Blue orb
+      - { MCDIndex: 0, light: { color: "#2c4de0", source: 13, fullBright: true } }
+  - type: GRUNGE4
+    data:
+      # Lift floor
+      - { MCDIndex: 32, light: { color: "#2cade0", source: 10, fullBright: true } }
+      # Spinny thing
+      - { MCDIndex: 33, light: { color: "#ffa600", source: 13, fullBright: false } }
+      # Exit
+      - { MCDIndex: 35, light: { color: "#eeff00", source: 4, fullBright: true } }
+  - type: CRYPT3
+    data:
+      # Incubators
+      - { MCDIndex: 4, light: { color: "#0092f3", source: 3, fullBright: true } }
+      - { MCDIndex: 7, light: { color: "#0092f3", source: 15, fullBright: true } }
+      - { MCDIndex: 10, light: { color: "#0092f3", source: 3, fullBright: true } }
+      # Walls
+      - { MCDIndex: 8, light: { color: "#478d19", source: 3, fullBright: false } }
+      - { MCDIndex: 9, light: { color: "#478d19", source: 3, fullBright: false } }
+  - type: CRYPT4
+    data:
+      # Metal walls
+      - { MCDIndex: 2, light: { color: "#a4bd61", source: 3, fullBright: false } }
+      - { MCDIndex: 3, light: { color: "#a4bd61", source: 3, fullBright: false } }
+      - { MCDIndex: 4, light: { color: "#a4bd61", source: 3, fullBright: false } }
+
+ambientLightByShade:
+  - { shade: 0, rgb: "#ffffff" }
+  - { shade: 1, rgb: "#ffffff" }
+  - { shade: 2, rgb: "#ffffff" }
+  - { shade: 3, rgb: "#ffffff" }
+  - { shade: 4, rgb: "#ffffff" }
+  - { shade: 5, rgb: "#e2cc9f" }
+  - { shade: 6, rgb: "#ddc987" }
+  - { shade: 7, rgb: "#daa160" }
+  - { shade: 8, rgb: "#ce8a5c" }
+  - { shade: 9, rgb: "#d87e54" }
+  - { shade: 10, rgb: "#7b8cd8" }
+  - { shade: 11, rgb: "#3d4f9b" }
+  - { shade: 12, rgb: "#2c3b7a" }
+  - { shade: 13, rgb: "#1b275c" }
+  - { shade: 14, rgb: "#05031a" }
+  - { shade: 15, rgb: "#02010c" }
+
+personalLightColor: "#ffffff"   # soldier's flashlight glow
+fireLightColor: "#e76021"   # fire - used for both burning tiles AND units on fire
