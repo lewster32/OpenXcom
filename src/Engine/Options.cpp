@@ -500,10 +500,10 @@ void createAdvancedOptionsOXCE()
 	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleSmokeOpacity", &oxceBattleSmokeOpacity, 100, "STR_SMOKE_OPACITY", "STR_BATTLESCAPE"));
 	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleSmokeOpacityMin", &oxceBattleSmokeOpacityMin, 100, "STR_SMOKE_OPACITY_MIN", "STR_BATTLESCAPE"));
 	_pairings.push_back({ &oxceBattleSmokeOpacityMin, &oxceBattleSmokeOpacity });
-	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleRealisticLighting", &oxceBattleRealisticLighting, false, "STR_REALISTIC_LIGHTING", "STR_BATTLESCAPE"));
+	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleRealisticLighting", &oxceBattleRealisticLighting, true, "STR_REALISTIC_LIGHTING", "STR_BATTLESCAPE"));
 	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleColourLightAllowOverride", &oxceBattleColourLightAllowOverride, true, "STR_COLOUR_LIGHT_ALLOW_OVERRIDE", "STR_BATTLESCAPE"));
-	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleColourLightPerCorner", &oxceBattleColourLightPerCorner, false, "STR_COLOUR_LIGHT_PER_CORNER", "STR_BATTLESCAPE"));
-	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleColourLightDither", &oxceBattleColourLightDither, 1, "STR_COLOUR_LIGHT_DITHER", "STR_BATTLESCAPE"));
+	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleColourLightPerCorner", &oxceBattleColourLightPerCorner, true, "STR_COLOUR_LIGHT_PER_CORNER", "STR_BATTLESCAPE"));
+	_info.push_back(OptionInfo(OPTION_OXCE, "oxceBattleColourLightDither", &oxceBattleColourLightDither, 2, "STR_COLOUR_LIGHT_DITHER", "STR_BATTLESCAPE"));
 	_gates.push_back({
 		&oxceBattleRealisticLighting,
 		{
