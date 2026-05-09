@@ -70,7 +70,7 @@ private:
 	int _lightColorR, _lightColorG, _lightColorB;
 	int _modLightColorR, _modLightColorG, _modLightColorB;
 	bool _hasModLightColor;
-	// Tri-state: -1 = unset (legacy auto from getLightSource()), 0 = forced off, 1 = forced on.
+	// Tri-state: -1 = unset (defaults to getLightSource() > 0), 0 = forced off, 1 = forced on.
 	int _fullBright;
 	int _armor, _flammable, _fuel, _explosive, _explosiveType, _bigWall;
 	int _sprite[8];
@@ -139,7 +139,7 @@ public:
 	int getDieMCD() const;
 	/// Sets the dead object ID.
 	void setDieMCD(int value);
-	/// Gets the effective lightSource. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied value (if any) wins; otherwise the vanilla / auto-derived value is returned.
+	/// Gets the effective lightSource. Mod-supplied value wins when both Options::oxceBattleRealisticLighting and Options::oxceBattleColourLightAllowOverride are on; otherwise the vanilla / auto-derived value is returned.
 	int getLightSource() const;
 	/// Sets the vanilla / auto-derived lightSource (called from MCD parsing).
 	void setLightSource(int value);
@@ -155,9 +155,9 @@ public:
 	bool hasModLightRadius() const { return _hasModLightRadius; }
 	/// True iff a mod-supplied lightIntensity override has been recorded.
 	bool hasModLightIntensity() const { return _hasModLightIntensity; }
-	/// Effective radius used by TileEngine::addLight. Returns the mod override if set, otherwise the resolved lightSource (vanilla or mod) value.
+	/// Effective radius used by TileEngine::addLight. Returns the mod override when realistic lighting is on and one was set; otherwise the resolved lightSource value.
 	int getEffectiveLightRadius() const;
-	/// Effective intensity used by TileEngine::addLight. Returns the mod override if set, otherwise resolved lightSource / 15.0.
+	/// Effective intensity used by TileEngine::addLight. Returns the mod override when realistic lighting is on and one was set; otherwise resolved lightSource / 15.0.
 	double getEffectiveLightIntensity() const;
 	/// Sets the per-source litChance (probability that this MCD's light is on for a given instance).
 	/// Called from MCDPatch when a light: { litChance: ... } sub-key is present.
@@ -168,13 +168,13 @@ public:
 	/// the given tile instance, given its litChance and a deterministic hash
 	/// of (position, part). Stable for the duration of a battle.
 	bool isLitInstance(Position pos, TilePart part) const;
-	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses Options::oxceBattleColourLightAllowOverride so callers like Mod::autoDeriveLightColors can iterate every part that could ever emit.
+	/// True iff this part emits light on either track (vanilla _lightSource > 0, or a mod-supplied override). Bypasses every Options gate so Mod::autoDeriveLightColors can iterate every part that could ever emit, regardless of runtime flags.
 	bool hasAnyLightSource() const { return _lightSource > 0 || _hasModLightSource; }
 	/// Gets the light emission point offset in voxel coords.
 	Position getLightOffset() const;
 	/// Sets the light emission point offset.
 	void setLightOffset(Position offset);
-	/// Gets the effective lightColour. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins; otherwise the auto-derived (or vanilla default) colour is returned.
+	/// Gets the effective lightColour. Mod-supplied colour wins when both Options::oxceBattleRealisticLighting and Options::oxceBattleColourLightAllowOverride are on; otherwise the auto-derived (or vanilla default) colour is returned.
 	void getLightColor(int &r, int &g, int &b) const;
 	/// Sets the auto-derived (or default) lightColour.
 	void setLightColor(int r, int g, int b);

@@ -1342,16 +1342,16 @@ int RuleItem::getPower() const
 
 /**
  * Gets the additive-photon RGB tint contributed by this item's light source.
- * With Options::oxceBattleColourLightAllowOverride on and a mod-supplied colour
- * recorded, returns the mod-supplied values; otherwise returns the auto-derived
- * (or vanilla white) track.
+ * Returns the mod-supplied values when both Options::oxceBattleRealisticLighting
+ * and Options::oxceBattleColourLightAllowOverride are on and a mod colour is
+ * recorded; otherwise returns the auto-derived (or vanilla white) track.
  * @param r Red channel (0-255).
  * @param g Green channel (0-255).
  * @param b Blue channel (0-255).
  */
 void RuleItem::getLightColor(int &r, int &g, int &b) const
 {
-	if (Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
 	{
 		r = _modLightColorR;
 		g = _modLightColorG;
@@ -1405,10 +1405,15 @@ bool RuleItem::getFullBright() const
 
 /**
  * Returns true if this item's light should be considered active for the
- * BattleItem instance with id `itemId`. Default litChance 1.0 short-circuits.
+ * BattleItem instance with id `itemId`. Returns true unconditionally when
+ * realistic lighting is off so every instance is lit in vanilla mode.
+ * Otherwise default litChance 1.0 short-circuits to true; lower values hash
+ * itemId for a stable per-instance pass/fail (fixed for the battle, follows
+ * the item through pick-up and drop).
  */
 bool RuleItem::isLitInstance(int itemId) const
 {
+	if (!Options::oxceBattleRealisticLighting) return true;
 	if (_litChance >= 1.0) return true;
 	const std::uint32_t h = LightingHash::mix(itemId, 0, 0, 0);
 	return LightingHash::passes(_litChance, h);
@@ -1416,11 +1421,11 @@ bool RuleItem::isLitInstance(int itemId) const
 
 /**
  * Returns the centre brightness for the BattleItem-driven addLight call. Mod
- * override wins; otherwise fallbackRange / 15.0.
+ * override wins when realistic lighting is on; otherwise fallbackRange / 15.0.
  */
 double RuleItem::getEffectiveLightIntensity(int fallbackRange) const
 {
-	if (_hasLightIntensity) return _lightIntensity;
+	if (Options::oxceBattleRealisticLighting && _hasLightIntensity) return _lightIntensity;
 	if (fallbackRange <= 0) return 0.0;
 	return fallbackRange / 15.0;
 }

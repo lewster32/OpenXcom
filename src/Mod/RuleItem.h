@@ -679,7 +679,7 @@ public:
 
 	/// Gets the item's power.
 	int getPower() const;
-	/// Gets the effective lightColor. With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins; otherwise the auto-derived (or vanilla white) value is returned.
+	/// Gets the effective lightColor. Mod-supplied colour wins when both Options::oxceBattleRealisticLighting and Options::oxceBattleColourLightAllowOverride are on; otherwise the auto-derived (or vanilla white) value is returned.
 	void getLightColor(int &r, int &g, int &b) const;
 	/// Sets the auto-derived (or default) lightColor.
 	void setLightColor(int r, int g, int b);

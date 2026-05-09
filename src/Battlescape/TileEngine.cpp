@@ -1171,7 +1171,7 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		bool winBypassLOS = false;
 		Position winOffset(0, 0, 0);
 
-		// Personal armour light: respects LOS when realistic lighting is on (so torches no longer wrap around walls), otherwise bypasses for vanilla wrap-around behaviour.
+		// Personal armour light: respects LOS under realistic lighting (so torches do not light through walls); bypasses LOS for vanilla wrap-around behaviour.
 		auto tryPersonalLight = [&](int personalPower)
 		{
 			if (personalPower > currLight)
@@ -1747,19 +1747,21 @@ void TileEngine::recalculateLighting()
 
 /**
  * Adds a light contribution radiating from `center` to every tile within
- * `radius`, attenuated by the inverse-square clamped curve in computeFalloff()
- * and modulated by `intensity` (centre brightness). intensity > 1.0 produces
- * channel-saturating blow-out.
+ * `radius`. With realistic lighting on, attenuation uses the inverse-square
+ * clamped curve in computeFalloff() modulated by `intensity` (centre
+ * brightness; > 1.0 produces channel-saturating blow-out). With realistic
+ * lighting off, attenuation is the vanilla `radius - distance` linear
+ * falloff and `intensity` / `lightR/G/B` / `lightOffset` are ignored.
  * @param gs           Map area subset to update.
  * @param center       Tile position the light radiates from.
  * @param radius       Throw distance in tiles. radius <= 0 short-circuits.
- * @param intensity    Centre brightness in [0.0, 5.0]. Capped at the spec's
- *                     blow-out range; 0.0 short-circuits.
+ * @param intensity    Realistic-lighting centre brightness in [0.0, 5.0].
+ *                     0.0 short-circuits when realistic; ignored otherwise.
  * @param layer        One of LL_AMBIENT, LL_FIRE, LL_ITEMS, LL_UNITS.
- * @param lightR/G/B   Light source colour in 0-255 per channel.
- * @param bypassLOS    If true and oxceBattleRealisticLighting is off, light
- *                     wraps around walls (vanilla flashlight behaviour).
- * @param lightOffset  Optional sub-tile offset of the source position, in voxels, applied as a
+ * @param lightR/G/B   Light source colour in 0-255 per channel. Realistic-lighting only.
+ * @param bypassLOS    If true and realistic lighting is off, light wraps
+ *                     around walls (vanilla flashlight behaviour).
+ * @param lightOffset  Realistic-lighting sub-tile source offset in voxels, applied as a
  *                     delta from the natural source centre. The LOS trace works on a coarser grid
  *                     of `divide` voxels per step (8 for LL_FIRE, 4 for LL_ITEMS / LL_UNITS), so
  *                     offsets smaller than `divide` round to zero. Offsets approaching half a tile
@@ -1771,9 +1773,16 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
                           int lightR, int lightG, int lightB,
                           bool bypassLOS, Position lightOffset)
 {
-	if (radius <= 0 || intensity <= 0.0)
+	// Vanilla mode: only radius gates the source; intensity / lightOffset are
+	// realistic-lighting inputs and are ignored.
+	const bool realistic = Options::oxceBattleRealisticLighting;
+	if (radius <= 0 || (realistic && intensity <= 0.0))
 	{
 		return;
+	}
+	if (!realistic)
+	{
+		lightOffset = Position(0, 0, 0);
 	}
 
 	const auto fire = layer == LL_FIRE;
@@ -1792,7 +1801,7 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 	// regardless of the mod's `lighting: { enhanced: N }` bitmask or the caller's
 	// bypassLOS hint. With it off, the original bypassLOS-then-mod-bits semantics apply.
 	const auto modBitsSet = getEnhancedLighting() & ((fire ? 1 : 0) | (items ? 2 : 0) | (units ? 4 : 0));
-	const auto clasicLighting = !Options::oxceBattleRealisticLighting && (bypassLOS || !modBitsSet);
+	const auto clasicLighting = !realistic && (bypassLOS || !modBitsSet);
 	const auto topTargetVoxel = static_cast<Sint16>(_save->getMapSizeZ() * accuracy.z - 1);
 	const auto topCenterVoxel = static_cast<Sint16>((getBlockUp(_blockVisibility[_save->getTileIndex(center)]) ? (center.z + 1) : _save->getMapSizeZ()) * accuracy.z - 1);
 	const auto maxFirePower = std::min(15, getMaxStaticLightDistance() - 1);
@@ -1807,24 +1816,17 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 			const auto diff = target - center;
 			const auto distance = (int)Round(Position::distance(target.toVoxel(), center.toVoxel()) / Position::TileXY);
 			const auto targetLight = tile->getLightMulti(layer);
-			const double falloff = computeFalloff(distance, radius);
-			const double effective = intensity * falloff;
-			// Linear scalar; perceptual gamma is applied only to units in Map::drawUnit.
-			auto currLight = std::min(15, (int)std::round(effective * 15.0));
+			// Vanilla: linear `power - distance`. Realistic: inverse-square clamped curve scaled by intensity.
+			// Either way, currLight ends up clamped to [0, 15] for the scalar light buffer.
+			const double falloff = realistic ? computeFalloff(distance, radius) : 0.0;
+			const double effective = realistic ? intensity * falloff : 0.0;
+			auto currLight = realistic
+				? std::min(15, (int)std::round(effective * 15.0))
+				: (radius - distance);
 
 			if (clasicLighting)
 			{
-				// RGB is additive across sources - write the contribution unconditionally so
-				// multiple sources at the same tile mix. Scalar light keeps its max-wins
-				// semantics (a brighter source still suppresses dimmer scalar updates).
-				if (currLight > 0)
-				{
-					const int cR = std::min(255, (int)std::round(lightR * effective));
-					const int cG = std::min(255, (int)std::round(lightG * effective));
-					const int cB = std::min(255, (int)std::round(lightB * effective));
-					for (int c = 0; c < 4; ++c)
-						tile->addLightRGB(cR, cG, cB, layer, c);
-				}
+				// Vanilla scalar-only path. clasicLighting implies !realistic, so no RGB write.
 				if (currLight > targetLight)
 				{
 					tile->addLight(currLight, layer);
@@ -1898,7 +1900,7 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 					{
 						light -= 1;
 					}
-					// Realistic lighting uses binary LOS; only the legacy path applies the
+					// Realistic lighting uses binary LOS; only the vanilla path applies the
 					// under-step penalty (which kills terrain MCD lights inside tall hulls).
 					if (!Options::oxceBattleRealisticLighting && height < cache.height)
 					{

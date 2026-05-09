@@ -31,7 +31,7 @@ namespace LightingHash
 // stay visible far from a light source's centre. Lower values brighten
 // units further: 1.0 = no softening, 0.5 = sqrt (perceptually justified),
 // 0.25 = fourth root, 0.1 = near-uniform unit shading across the lit area
-// (current in-game-tuned default for tactical visibility).
+// (in-game-tuned default for tactical visibility).
 constexpr double SCALAR_GAMMA = 0.1;
 
 // Boost-style per-step hash combiner. Has weak avalanche on its own when fed
@@ -68,7 +68,7 @@ inline std::uint32_t mix(int a, int b, int c, int d)
 
 // Returns true if a source with this litChance should be considered lit
 // for the instance whose stable hash is `hash`. Default litChance >= 1.0
-// short-circuits so the hot path stays the same as legacy code.
+// short-circuits the hash compare so always-lit sources stay branch-free.
 inline bool passes(double litChance, std::uint32_t hash)
 {
 	if (litChance >= 1.0) return true;

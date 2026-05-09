@@ -31,6 +31,7 @@
 #include "../Engine/SurfaceSet.h"
 #include "../Engine/Script.h"
 #include "../Engine/ScriptBind.h"
+#include "../Engine/Options.h"
 #include "../Engine/RNG.h"
 #include "../Battlescape/Particle.h"
 #include "../fmath.h"
@@ -1235,11 +1236,14 @@ bool BattleItem::getGlow() const
 }
 
 /**
- * Gets range of glow in tiles.
+ * Gets range of glow in tiles. With realistic lighting on, an explicit
+ * `light.radius:` on the RuleItem wins over the power-derived range.
  * @return Range.
  */
 int BattleItem::getGlowRange() const
 {
+	if (Options::oxceBattleRealisticLighting && _rules->hasLightRadius())
+		return _rules->getLightRadius();
 	auto* owner = _unit ? _unit : _previousOwner;
 	return _rules->getPowerBonus({ BA_NONE, owner, this, this });
 }

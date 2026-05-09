@@ -381,14 +381,15 @@ void MapData::setDieMCD(int value)
 
 /**
  * Gets the effective lightSource.
- * With Options::oxceBattleColourLightAllowOverride on, the mod-supplied value (if any) wins;
- * otherwise the vanilla / auto-derived value is returned.
+ * Mod-supplied value wins when both Options::oxceBattleRealisticLighting and
+ * Options::oxceBattleColourLightAllowOverride are on; otherwise the vanilla /
+ * auto-derived value is returned.
  * @return The effective light emission strength.
  */
 int MapData::getLightSource() const
 {
 	int value = _lightSource;
-	if (Options::oxceBattleColourLightAllowOverride && _hasModLightSource)
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightAllowOverride && _hasModLightSource)
 		value = _modLightSource;
 	// lamp posts have 1, but they should emit more light
 	if (value == 1)
@@ -448,43 +449,50 @@ void MapData::setLitChance(double value)
 }
 
 /**
- * Returns the radius used by TileEngine::addLight. Mod override wins;
- * otherwise falls back to the resolved lightSource value.
+ * Returns the radius used by TileEngine::addLight. Mod override wins
+ * when realistic lighting is on; otherwise falls back to the resolved lightSource value.
  */
 int MapData::getEffectiveLightRadius() const
 {
-	if (_hasModLightRadius) return _modLightRadius;
+	if (Options::oxceBattleRealisticLighting && _hasModLightRadius) return _modLightRadius;
 	return getLightSource();
 }
 
 /**
  * Returns the centre brightness used by TileEngine::addLight. Mod override
- * wins; otherwise lightSource / 15.0.
+ * wins when realistic lighting is on; otherwise lightSource / 15.0.
  */
 double MapData::getEffectiveLightIntensity() const
 {
-	if (_hasModLightIntensity) return _modLightIntensity;
+	if (Options::oxceBattleRealisticLighting && _hasModLightIntensity) return _modLightIntensity;
 	return getLightSource() / 15.0;
 }
 
 /**
  * Returns true if this MapData's light should be considered active for
- * the instance at (pos, part). Default litChance 1.0 short-circuits to
- * true; otherwise hashes the inputs and compares against litChance.
+ * the instance at (pos, part). Returns true unconditionally when realistic
+ * lighting is off so every instance is lit in vanilla mode. Otherwise default
+ * litChance 1.0 short-circuits to true; lower values hash (pos, part) for a
+ * stable per-instance pass/fail (the result is fixed for the battle, not
+ * per-frame).
  */
 bool MapData::isLitInstance(Position pos, TilePart part) const
 {
+	if (!Options::oxceBattleRealisticLighting) return true;
 	if (_litChance >= 1.0) return true;
 	const std::uint32_t h = LightingHash::mix(pos.x, pos.y, pos.z, static_cast<int>(part));
 	return LightingHash::passes(_litChance, h);
 }
 
 /**
- * Gets the light emission point offset in voxel coords.
+ * Gets the light emission point offset in voxel coords. Returns (0,0,0)
+ * unless realistic lighting is on so the LOS trace centre is unperturbed
+ * in vanilla mode.
  * @return The offset as a Position.
  */
 Position MapData::getLightOffset() const
 {
+	if (!Options::oxceBattleRealisticLighting) return Position(0, 0, 0);
 	return _lightOffset;
 }
 
@@ -511,15 +519,16 @@ bool MapData::getFullBright() const
 
 /**
  * Gets the effective lightColour.
- * With Options::oxceBattleColourLightAllowOverride on, the mod-supplied colour (if any) wins;
- * otherwise the auto-derived (or vanilla default) colour is returned.
+ * Mod-supplied colour wins when both Options::oxceBattleRealisticLighting and
+ * Options::oxceBattleColourLightAllowOverride are on; otherwise the auto-derived
+ * (or vanilla default) colour is returned.
  * @param r Red channel (out).
  * @param g Green channel (out).
  * @param b Blue channel (out).
  */
 void MapData::getLightColor(int &r, int &g, int &b) const
 {
-	if (Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
+	if (Options::oxceBattleRealisticLighting && Options::oxceBattleColourLightAllowOverride && _hasModLightColor)
 	{
 		r = _modLightColorR;
 		g = _modLightColorG;
