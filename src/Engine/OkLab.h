@@ -19,7 +19,7 @@
  */
 
 /*
- * Single-source perceptual colour math for the coloured-lighting pipeline.
+ * Single-source perceptual colour math for the Realistic Lighting pipeline.
  *
  * - srgbToLinear / linearToSrgb : sRGB <-> linear-light conversion using the
  *   standard piecewise-linear curve below 0.04045 / 0.0031308 and gamma 2.4

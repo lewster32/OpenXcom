@@ -180,9 +180,9 @@ struct EngineData
  * List of engines that current version support.
  *
  * The "Extended" entry keeps stock-OXCE mods loading on this build. The
- * "OXCE-RL" entry advertises this fork's identity so mods that rely on
- * coloured-lighting fields (lightRadius, lightIntensity, litChance,
- * lightOffset, lightColor, ...) can pin to it via:
+ * "OXCE-RL" entry advertises this fork's identity (Realistic Lighting) so
+ * mods that rely on Realistic Lighting fields (lightRadius, lightIntensity,
+ * litChance, lightOffset, lightColor, ...) can pin to it via:
  *   requiredExtendedEngine: OXCE-RL
  *   requiredExtendedVersion: 1.0
  * The empty entry is the default-unpinned path; do not remove it.
