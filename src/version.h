@@ -25,6 +25,17 @@
 #define OPENXCOM_VERSION_LONG "8.6.1.0"
 #define OPENXCOM_VERSION_NUMBER 8,6,1,0
 
+// Fork identity, advertised alongside the upstream "Extended" engine in
+// ModInfo's supportedEngines table. Mods that depend on coloured-lighting
+// features can pin to this fork via:
+//   requiredExtendedEngine: OXCE-RL
+//   requiredExtendedVersion: 1.0
+// while mods that only need stock OXCE keep working through the "Extended"
+// entry. Bump OPENXCOM_FORK_VERSION_NUMBER when a release introduces fields or
+// behaviour that older fork builds cannot honour.
+#define OPENXCOM_FORK_ENGINE "OXCE-RL"
+#define OPENXCOM_FORK_VERSION_NUMBER 1,0,0,0
+
 #ifndef OPENXCOM_VERSION_GIT
 #define OPENXCOM_VERSION_GIT " (1d7300d51)"
 #endif

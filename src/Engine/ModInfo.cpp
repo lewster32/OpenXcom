@@ -178,9 +178,18 @@ struct EngineData
 
 /**
  * List of engines that current version support.
+ *
+ * The "Extended" entry keeps stock-OXCE mods loading on this build. The
+ * "OXCE-RL" entry advertises this fork's identity so mods that rely on
+ * coloured-lighting fields (lightRadius, lightIntensity, litChance,
+ * lightOffset, lightColor, ...) can pin to it via:
+ *   requiredExtendedEngine: OXCE-RL
+ *   requiredExtendedVersion: 1.0
+ * The empty entry is the default-unpinned path; do not remove it.
  */
 const EngineData supportedEngines[] = {
 	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
+	{ OPENXCOM_FORK_ENGINE,    { OPENXCOM_FORK_VERSION_NUMBER }},
 	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
 };
 
@@ -320,6 +329,12 @@ static auto dummy = ([]
 	assert(!findCompatibleEngine(supportedEngines, "Extended", create(OPENXCOM_VERSION_NUMBER + 1)));
 	assert(!findCompatibleEngine(supportedEngines, "XYZ", create(OPENXCOM_VERSION_NUMBER)));
 	assert(!findCompatibleEngine(supportedEngines, "XYZ", create(0, 0, 0, 0)));
+
+	// Fork engine pinning: OXCE-RL must be recognised, must accept its own
+	// version, must reject a higher-than-current pin.
+	assert(findCompatibleEngine(supportedEngines, OPENXCOM_FORK_ENGINE, create(OPENXCOM_FORK_VERSION_NUMBER)));
+	assert(findCompatibleEngine(supportedEngines, OPENXCOM_FORK_ENGINE, create(0, 0, 0, 0)));
+	assert(!findCompatibleEngine(supportedEngines, OPENXCOM_FORK_ENGINE, create(OPENXCOM_FORK_VERSION_NUMBER + 1)));
 
 
 	auto check = [](const std::string& a, const std::string& b)
