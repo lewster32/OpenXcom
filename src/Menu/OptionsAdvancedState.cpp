@@ -333,11 +333,17 @@ void OptionsAdvancedState::refreshOptionRow(int *ptr)
 	};
 	for (int k = 0; k < 5; ++k)
 	{
-		if (sections[k].base < 0) continue;
+		if (sections[k].base < 0)
+		{
+			continue;
+		}
 		const std::vector<OptionInfo> &s = *sections[k].settings;
 		for (size_t j = 0; j < s.size(); ++j)
 		{
-			if (s[j].type() != OPTION_INT || s[j].asInt() != ptr) continue;
+			if (s[j].type() != OPTION_INT || s[j].asInt() != ptr)
+			{
+				continue;
+			}
 			std::ostringstream ss;
 			ss << *ptr;
 			_lstOptions->setCellText(sections[k].base + 1 + (int)j, 1, ss.str());
@@ -359,7 +365,10 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 	}
 	size_t sel = _lstOptions->getSelectedRow();
 	OptionInfo *setting = getSetting(sel);
-	if (!setting) return;
+	if (!setting)
+	{
+		return;
+	}
 
 	// greyed out options are fixed, cannot be changed by the user
 	auto& fixeduserOptions = _game->getMod()->getFixedUserOptions();
@@ -372,7 +381,10 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 	// Locked out by an OptionGate whose controller bool is false. Refuse the
 	// click silently so the value stays as it was when the gate closed -
 	// re-opening the gate restores the visible/editable state.
-	if (isOptionDisabled(*setting)) return;
+	if (isOptionDisabled(*setting))
+	{
+		return;
+	}
 
 	std::string settingText;
 	if (setting->type() == OPTION_BOOL)
@@ -520,8 +532,14 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		for (size_t p = 0; p < pairings.size(); ++p)
 		{
 			const OptionPair &pair = pairings[p];
-			if (i != pair.lesser && i != pair.greater) continue;
-			if (*pair.lesser <= *pair.greater) continue;
+			if (i != pair.lesser && i != pair.greater)
+			{
+				continue;
+			}
+			if (*pair.lesser <= *pair.greater)
+			{
+				continue;
+			}
 			int *partner = (i == pair.lesser) ? pair.greater : pair.lesser;
 			*partner = *i;
 			refreshOptionRow(partner);
@@ -567,14 +585,23 @@ bool OptionsAdvancedState::isOptionDisabled(const OptionInfo &setting) const
 {
 	void *p = (setting.type() == OPTION_BOOL) ? (void*)setting.asBool() :
 	          (setting.type() == OPTION_INT)  ? (void*)setting.asInt()  : 0;
-	if (!p) return false;
+	if (!p)
+	{
+		return false;
+	}
 	const std::vector<OptionGate> &gates = Options::getOptionGates();
 	for (size_t g = 0; g < gates.size(); ++g)
 	{
-		if (*gates[g].gate) continue; // gate open - dependents allowed
+		if (*gates[g].gate) // gate open - dependents allowed
+		{
+			continue;
+		}
 		for (size_t d = 0; d < gates[g].dependents.size(); ++d)
 		{
-			if (gates[g].dependents[d] == p) return true;
+			if (gates[g].dependents[d] == p)
+			{
+				return true;
+			}
 		}
 	}
 	return false;
@@ -597,7 +624,10 @@ void OptionsAdvancedState::refreshDisabledRowColors()
 			gateable.insert(gates[g].dependents[d]);
 		}
 	}
-	if (gateable.empty()) return;
+	if (gateable.empty())
+	{
+		return;
+	}
 
 	OptionOwner idx = _owner == _btnOXC ? OPTION_OXC : _owner == _btnOXCE ? OPTION_OXCE : OPTION_OTHER;
 	struct Section { int base; const std::vector<OptionInfo> *settings; };
@@ -611,13 +641,19 @@ void OptionsAdvancedState::refreshDisabledRowColors()
 	const Uint8 defaultColor = _lstOptions->getColor();
 	for (int s = 0; s < 5; ++s)
 	{
-		if (sections[s].base < 0) continue;
+		if (sections[s].base < 0)
+		{
+			continue;
+		}
 		const std::vector<OptionInfo> &v = *sections[s].settings;
 		for (size_t i = 0; i < v.size(); ++i)
 		{
 			void *p = (v[i].type() == OPTION_BOOL) ? (void*)v[i].asBool() :
 			          (v[i].type() == OPTION_INT)  ? (void*)v[i].asInt()  : 0;
-			if (!p || !gateable.count(p)) continue;
+			if (!p || !gateable.count(p))
+			{
+				continue;
+			}
 			const size_t row = (size_t)(sections[s].base + 1 + (int)i);
 			const Uint8 color = isOptionDisabled(v[i]) ? _greyedOutColor : defaultColor;
 			_lstOptions->setCellColor(row, 0, color);
@@ -634,11 +670,20 @@ void OptionsAdvancedState::refreshDisabledRowColors()
 void OptionsAdvancedState::recalculateBattleLighting()
 {
 	SavedGame *save = _game->getSavedGame();
-	if (!save) return;
+	if (!save)
+	{
+		return;
+	}
 	SavedBattleGame *battle = save->getSavedBattle();
-	if (!battle) return;
+	if (!battle)
+	{
+		return;
+	}
 	TileEngine *te = battle->getTileEngine();
-	if (!te) return;
+	if (!te)
+	{
+		return;
+	}
 	te->recalculateLighting();
 }
 

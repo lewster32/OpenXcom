@@ -3163,7 +3163,10 @@ inline void BattlescapeState::handle(Action *action)
 							for (int p = 0; p < O_MAX; ++p)
 							{
 								MapData *md = cursorTile->getMapData((TilePart)p);
-								if (!md) continue;
+								if (!md)
+								{
+									continue;
+								}
 								int mapDataID = -1, mapDataSetID = -1;
 								cursorTile->getMapData(&mapDataID, &mapDataSetID, (TilePart)p);
 								std::string dsName = "?";

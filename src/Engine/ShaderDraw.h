@@ -258,8 +258,14 @@ struct FullBrightShade
 	{
 		if (src)
 		{
-			if (shade >= 16) dest = ColorShade; // fog-of-war: pure black
-			else             dest = src;
+			if (shade >= 16) // fog-of-war: pure black
+			{
+				dest = ColorShade;
+			}
+			else
+			{
+				dest = src;
+			}
 		}
 	}
 };

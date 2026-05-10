@@ -1060,7 +1060,10 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 	// reserved for upward extrusion and are transparent on flat floors.
 	// So the diamond's top vertex is at sprite-Y = srcH - diamondH.
 	const int diamondH = srcW / 2;
-	if (diamondH <= 0) return;
+	if (diamondH <= 0)
+	{
+		return;
+	}
 	const int diamondTop = srcH - diamondH;
 
 	// Fixed-point arithmetic (16-bit fraction) so the inner loop avoids floats.
@@ -1079,14 +1082,24 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 		// v: vertical position normalised over the diamond (top=0, bottom=FP).
 		// Pixels above the diamond top clamp to 0; below clamp to FP.
 		int v = ((py - diamondTop) * FP + FP / 2) / diamondH;
-		if (v < 0) v = 0; else if (v > FP) v = FP;
+		if (v < 0)
+		{
+			v = 0;
+		}
+		else if (v > FP)
+		{
+			v = FP;
+		}
 		dither.beginRow(py);
 
 		const Uint8 *srcRow = srcBuf + py * srcPitch;
 		for (int px = 0; px < srcW; ++px)
 		{
 			Uint8 src = srcRow[px];
-			if (!src) continue;
+			if (!src)
+			{
+				continue;
+			}
 			int u = (px * FP + FP / 2) / srcW;
 
 			// Iso-diamond bilinear weights:
@@ -1095,8 +1108,22 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 			// At the 4 diamond vertices these reach the full [0, 1] range.
 			int ns = (u - v) + FP / 2;
 			int nt = (u + v) - FP / 2;
-			if (nt < 0) nt = 0; else if (nt > FP) nt = FP;
-			if (ns < 0) ns = 0; else if (ns > FP) ns = FP;
+			if (nt < 0)
+			{
+				nt = 0;
+			}
+			else if (nt > FP)
+			{
+				nt = FP;
+			}
+			if (ns < 0)
+			{
+				ns = 0;
+			}
+			else if (ns > FP)
+			{
+				ns = FP;
+			}
 
 			// Bilinear interpolation in scaled (FP-precision) units.
 			// rN16 / gN16 / bN16 are [0, 15*FP] after the east-interpolation step.
@@ -1119,7 +1146,10 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 
 			const int sx = x + px;
 			const int sy = y + py;
-			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH) continue;
+			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH)
+			{
+				continue;
+			}
 
 			// Pure additive: skip the shade-darkens-source step; the LUT encodes
 			// src * light so dim light naturally gives a dim result. Only honour
@@ -1129,9 +1159,13 @@ void Surface::blitRawTintFloor(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint
 			{
 				const Uint8 newShade = (src & helper::ColorShade) + (Uint8)shade;
 				if (newShade & helper::ColorGroup)
+				{
 					shaded = helper::ColorShade;
+				}
 				else
+				{
 					shaded = (src & helper::ColorGroup) | newShade;
+				}
 			}
 			else
 			{
@@ -1183,11 +1217,17 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
 	const int srcH = srcSurf.getHeight();
 	const int destW = destSurf.getWidth();
 	const int destH = destSurf.getHeight();
-	if (srcW <= 0 || srcH <= 0) return;
+	if (srcW <= 0 || srcH <= 0)
+	{
+		return;
+	}
 
 	// Guard against caller passing a degenerate or inverted domain.
 	const int xSpan = xEnd - xStart;
-	if (xSpan <= 0) return;
+	if (xSpan <= 0)
+	{
+		return;
+	}
 
 	// Fixed-point arithmetic (16-bit fraction) so the inner loop avoids floats.
 	const int FP = 65536;
@@ -1214,12 +1254,22 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
 		for (int px = pxStart; px < srcW; ++px)
 		{
 			const Uint8 src = srcRow[px];
-			if (!src) continue;
+			if (!src)
+			{
+				continue;
+			}
 
 			// 1D linear interp parameter: clamped to [0, FP] so pixels outside
 			// the gradient domain settle on the nearest endpoint.
 			int t = ((px - xStart) * FP + xSpan / 2) / xSpan;
-			if (t < 0) t = 0; else if (t > FP) t = FP;
+			if (t < 0)
+			{
+				t = 0;
+			}
+			else if (t > FP)
+			{
+				t = FP;
+			}
 
 			// Linear interpolation; result keeps 4 extra bits of fraction for
 			// dithering. Final scale [0..240] (= 0..15 * 16). Mirrors the floor
@@ -1235,7 +1285,10 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
 
 			const int sx = x + px;
 			const int sy = y + py;
-			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH) continue;
+			if (sx < 0 || sx >= destW || sy < 0 || sy >= destH)
+			{
+				continue;
+			}
 
 			// Pure additive: skip the shade-darkens-source step; the LUT encodes
 			// src * light so dim light naturally gives a dim result. Only honour
@@ -1245,9 +1298,13 @@ void Surface::blitRawTintWall(SurfaceRaw<Uint8> destSurf, SurfaceRaw<const Uint8
 			{
 				const Uint8 newShade = (src & helper::ColorShade) + (Uint8)shade;
 				if (newShade & helper::ColorGroup)
+				{
 					shaded = helper::ColorShade;
+				}
 				else
+				{
 					shaded = (src & helper::ColorGroup) | newShade;
+				}
 			}
 			else
 			{

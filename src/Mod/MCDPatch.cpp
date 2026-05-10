@@ -166,29 +166,49 @@ void MCDPatch::load(const YAML::YamlNodeReader& reader)
 			if (lightNode["radius"])
 			{
 				int radius = lightNode["radius"].readVal<int>();
-				if (radius < 1) radius = 1;
-				if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
+				if (radius < 1)
+				{
+					radius = 1;
+				}
+				if (radius > LIGHT_RADIUS_MAX)
+				{
+					radius = LIGHT_RADIUS_MAX;
+				}
 				_lightRadii.push_back(std::make_pair(MCDIndex, radius));
 			}
 			if (lightNode["intensity"])
 			{
 				double intensity = lightNode["intensity"].readVal<double>();
-				if (intensity < 0.0) intensity = 0.0;
-				if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
+				if (intensity < 0.0)
+				{
+					intensity = 0.0;
+				}
+				if (intensity > LIGHT_INTENSITY_MAX)
+				{
+					intensity = LIGHT_INTENSITY_MAX;
+				}
 				_lightIntensities.push_back(std::make_pair(MCDIndex, intensity));
 			}
 			if (lightNode["litChance"])
 			{
 				double litChance = lightNode["litChance"].readVal<double>();
-				if (litChance < 0.0) litChance = 0.0;
-				if (litChance > 1.0) litChance = 1.0;
+				if (litChance < 0.0)
+				{
+					litChance = 0.0;
+				}
+				if (litChance > 1.0)
+				{
+					litChance = 1.0;
+				}
 				_litChances.push_back(std::make_pair(MCDIndex, litChance));
 			}
 			if (lightNode["offset"])
 			{
 				std::vector<int> offset = lightNode["offset"].readVal<std::vector<int> >();
 				if (offset.size() == 3)
+				{
 					_lightOffsets.push_back(std::make_pair(MCDIndex, offset));
+				}
 			}
 			if (lightNode["color"])
 			{
@@ -300,11 +320,16 @@ void MCDPatch::modifyData(MapDataSet *dataSet) const
 	for (const auto& pair : _lightColors)
 	{
 		const std::vector<int>& rgb = pair.second;
-		if (rgb.size() != 3) continue;
+		if (rgb.size() != 3)
+		{
+			continue;
+		}
 		MapData* md = dataSet->getObject(pair.first);
 		md->setModLightColor(rgb[0], rgb[1], rgb[2]);
 		if (!md->hasModLightSource() && md->getLightSource() <= 0)
+		{
 			md->setModLightSource(1);
+		}
 	}
 	for (const auto& pair : _fullBrights)
 	{

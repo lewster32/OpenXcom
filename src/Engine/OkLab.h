@@ -50,8 +50,14 @@ inline double srgbToLinear(int c)
 // byte output and clamps at the extremes.
 inline int linearToSrgb(double c)
 {
-	if (c <= 0.0) return 0;
-	if (c >= 1.0) return 255;
+	if (c <= 0.0)
+	{
+		return 0;
+	}
+	if (c >= 1.0)
+	{
+		return 255;
+	}
 	double f = c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1.0 / 2.4) - 0.055;
 	return (int)std::lround(f * 255.0);
 }

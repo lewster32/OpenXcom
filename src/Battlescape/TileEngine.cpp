@@ -67,7 +67,10 @@ constexpr double PERSONAL_LIGHT_INTENSITY = 0.8;
 double computeFalloff(int distance, int radius)
 {
 	assert(distance >= 0);
-	if (radius <= 0 || distance >= radius) return 0.0;
+	if (radius <= 0 || distance >= radius)
+	{
+		return 0.0;
+	}
 	const double d2 = static_cast<double>(distance) * distance;
 	const double r2 = static_cast<double>(radius)   * radius;
 	const double rawD = 1.0 / (1.0 + LIGHT_FALLOFF_K * d2);
@@ -981,7 +984,10 @@ void TileEngine::calculateSkyVisibility()
 			for (int z = mapZ - 1; z >= 0; --z)
 			{
 				Tile *tile = _save->getTile(Position(x, y, z));
-				if (!tile) continue;
+				if (!tile)
+				{
+					continue;
+				}
 
 				// Diagonal-walled tiles always render lit; skip the
 				// roofing check so chamfered corners stay bright.
@@ -1215,7 +1221,10 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		const BattleItem *handWeapons[] = { unit->getLeftHandWeapon(), unit->getRightHandWeapon() };
 		for (const BattleItem *w : handWeapons)
 		{
-			if (!w) continue;
+			if (!w)
+			{
+				continue;
+			}
 
 			if (w->getGlow() && w->getRules()->isLitInstance(w->getId()))
 			{
@@ -1379,7 +1388,10 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 					// Reset RGB accumulators for the static layers covered by this recalc.
 					// LL_AMBIENT (0) is always overwritten by setAccumRGB in finaliseTintPass, so
 					// it does not need a reset here - only LL_FIRE needs clearing in the static pass.
-					if (layer <= LL_FIRE) tile->resetAccumulator(LL_FIRE);
+					if (layer <= LL_FIRE)
+					{
+						tile->resetAccumulator(LL_FIRE);
+					}
 				}
 			}
 		);
@@ -1395,8 +1407,14 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 				tile->resetLightMulti(std::max(layer, LL_ITEMS));
 				// Reset RGB accumulators for the dynamic layers covered by this recalc.
 				const LightLayers dynLayer = std::max(layer, LL_ITEMS);
-				if (dynLayer <= LL_ITEMS) tile->resetAccumulator(LL_ITEMS);
-				if (dynLayer <= LL_UNITS) tile->resetAccumulator(LL_UNITS);
+				if (dynLayer <= LL_ITEMS)
+				{
+					tile->resetAccumulator(LL_ITEMS);
+				}
+				if (dynLayer <= LL_UNITS)
+				{
+					tile->resetAccumulator(LL_UNITS);
+				}
 			}
 		}
 	);
@@ -1406,9 +1424,18 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 		calculateSkyVisibility();
 		calculateSunShading(gsStatic);
 	}
-	if (layer <= LL_FIRE) calculateTerrainBackground(gsStatic);
-	if (layer <= LL_ITEMS) calculateTerrainItems(gsDynamic);
-	if (layer <= LL_UNITS) calculateUnitLighting(gsDynamic);
+	if (layer <= LL_FIRE)
+	{
+		calculateTerrainBackground(gsStatic);
+	}
+	if (layer <= LL_ITEMS)
+	{
+		calculateTerrainItems(gsDynamic);
+	}
+	if (layer <= LL_UNITS)
+	{
+		calculateUnitLighting(gsDynamic);
+	}
 
 	finaliseTintPass();
 }
@@ -1427,7 +1454,10 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
  */
 void TileEngine::finaliseTintPass()
 {
-	if (!Options::oxceBattleRealisticLighting) return;
+	if (!Options::oxceBattleRealisticLighting)
+	{
+		return;
+	}
 
 	// Resolve ambient RGB for this global shade.
 	// Per-mission AlienDeployment override takes precedence over the mod-wide default.
@@ -1455,7 +1485,9 @@ void TileEngine::finaliseTintPass()
 		const int aG = (ambG * sv) / 15;
 		const int aB = (ambB * sv) / 15;
 		for (int c = 0; c < 4; ++c)
+		{
 			tile->setAccumRGB(aR, aG, aB, LL_AMBIENT, c);
+		}
 	}
 
 	// Snapshot accumulators before bloom/stitch and restore after quantise so
@@ -1536,7 +1568,10 @@ void TileEngine::finaliseTintPass()
  */
 void TileEngine::bloomLighting()
 {
-	if (!Options::oxceBattleRealisticLighting) return;
+	if (!Options::oxceBattleRealisticLighting)
+	{
+		return;
+	}
 
 	const int sx = _save->getMapSizeX();
 	const int sy = _save->getMapSizeY();
@@ -1551,7 +1586,10 @@ void TileEngine::bloomLighting()
 
 	const bool perCorner = Options::oxceBattleColourLightPerCorner;
 	std::vector<int> origCorners;
-	if (perCorner) origCorners.resize(sx * sy * sz * 4);
+	if (perCorner)
+	{
+		origCorners.resize(sx * sy * sz * 4);
+	}
 
 	for (int layer = 0; layer < LL_MAX; ++layer)
 	{
@@ -1576,9 +1614,18 @@ void TileEngine::bloomLighting()
 					int r = t->getAccumR(layer, 0);
 					int g = t->getAccumG(layer, 0);
 					int b = t->getAccumB(layer, 0);
-					if (channel == 0) r = avg;
-					else if (channel == 1) g = avg;
-					else b = avg;
+					if (channel == 0)
+					{
+						r = avg;
+					}
+					else if (channel == 1)
+					{
+						g = avg;
+					}
+					else
+					{
+						b = avg;
+					}
 					t->setAccumRGB(r, g, b, layer, 0);
 				}
 			}
@@ -1601,27 +1648,57 @@ void TileEngine::bloomLighting()
 						for (int x = 0; x < sx; ++x)
 						{
 							Tile *t = _save->getTile(Position(x, y, z));
-							if (!t) continue;
+							if (!t)
+							{
+								continue;
+							}
 							int best = tmp[(z * sy + y) * sx + x];
 							for (int d = 0; d < 4; ++d)
 							{
 								int nx = x + dx[d];
 								int ny = y + dy[d];
-								if (nx < 0 || ny < 0 || nx >= sx || ny >= sy) continue;
+								if (nx < 0 || ny < 0 || nx >= sx || ny >= sy)
+								{
+									continue;
+								}
 								Tile *n = _save->getTile(Position(nx, ny, z));
-								if (!n) continue;
-								if (horizontalBlockage(t, n, DT_NONE) > 0) continue;
+								if (!n)
+								{
+									continue;
+								}
+								if (horizontalBlockage(t, n, DT_NONE) > 0)
+								{
+									continue;
+								}
 								int leaked = tmp[(z * sy + ny) * sx + nx] - decayRGB;
-								if (leaked > best) best = leaked;
+								if (leaked > best)
+								{
+									best = leaked;
+								}
 							}
-							if (best > 255) best = 255;
-							if (best < 0) best = 0;
+							if (best > 255)
+							{
+								best = 255;
+							}
+							if (best < 0)
+							{
+								best = 0;
+							}
 							int r = t->getAccumR(layer, 0);
 							int g = t->getAccumG(layer, 0);
 							int b = t->getAccumB(layer, 0);
-							if (channel == 0) r = best;
-							else if (channel == 1) g = best;
-							else b = best;
+							if (channel == 0)
+							{
+								r = best;
+							}
+							else if (channel == 1)
+							{
+								g = best;
+							}
+							else
+							{
+								b = best;
+							}
 							t->setAccumRGB(r, g, b, layer, 0);
 						}
 					}
@@ -1643,14 +1720,29 @@ void TileEngine::bloomLighting()
 					for (int c = 0; c < 4; ++c)
 					{
 						int v = origCorners[i*4 + c] + delta;
-						if (v > 255) v = 255;
-						if (v < 0) v = 0;
+						if (v > 255)
+						{
+							v = 255;
+						}
+						if (v < 0)
+						{
+							v = 0;
+						}
 						int r = t->getAccumR(layer, c);
 						int g = t->getAccumG(layer, c);
 						int b = t->getAccumB(layer, c);
-						if (channel == 0) r = v;
-						else if (channel == 1) g = v;
-						else b = v;
+						if (channel == 0)
+						{
+							r = v;
+						}
+						else if (channel == 1)
+						{
+							g = v;
+						}
+						else
+						{
+							b = v;
+						}
 						t->setAccumRGB(r, g, b, layer, c);
 					}
 				}
@@ -1678,7 +1770,10 @@ void TileEngine::bloomLighting()
  */
 void TileEngine::stitchVertices()
 {
-	if (!Options::oxceBattleRealisticLighting || !Options::oxceBattleColourLightPerCorner) return;
+	if (!Options::oxceBattleRealisticLighting || !Options::oxceBattleColourLightPerCorner)
+	{
+		return;
+	}
 
 	const int sx = _save->getMapSizeX();
 	const int sy = _save->getMapSizeY();
@@ -1704,7 +1799,10 @@ void TileEngine::stitchVertices()
 				for (int i = 0; i < 4; ++i)
 				{
 					int tx = refs[i][0], ty = refs[i][1];
-					if (tx < 0 || tx >= sx || ty < 0 || ty >= sy) continue;
+					if (tx < 0 || tx >= sx || ty < 0 || ty >= sy)
+					{
+						continue;
+					}
 					tiles[i] = _save->getTile(Position(tx, ty, z));
 				}
 
@@ -1712,17 +1810,31 @@ void TileEngine::stitchVertices()
 				// are orthogonally adjacent and no wall blocks between them.
 				// Geometry is layer-independent so the unions are done once.
 				int parent[4] = { 0, 1, 2, 3 };
-				auto find = [&](int x) {
-					while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+				auto find = [&](int x)
+				{
+					while (parent[x] != x)
+					{
+						parent[x] = parent[parent[x]];
+						x = parent[x];
+					}
 					return x;
 				};
 				for (int e = 0; e < 4; ++e)
 				{
 					int a = edges[e][0], b = edges[e][1];
-					if (!tiles[a] || !tiles[b]) continue;
-					if (horizontalBlockage(tiles[a], tiles[b], DT_NONE) > 0) continue;
+					if (!tiles[a] || !tiles[b])
+					{
+						continue;
+					}
+					if (horizontalBlockage(tiles[a], tiles[b], DT_NONE) > 0)
+					{
+						continue;
+					}
 					int ra = find(a), rb = find(b);
-					if (ra != rb) parent[ra] = rb;
+					if (ra != rb)
+					{
+						parent[ra] = rb;
+					}
 				}
 
 				for (int layer = 0; layer < LL_MAX; ++layer)
@@ -1734,22 +1846,40 @@ void TileEngine::stitchVertices()
 					int count[4] = { 0, 0, 0, 0 };
 					for (int i = 0; i < 4; ++i)
 					{
-						if (!tiles[i]) continue;
+						if (!tiles[i])
+						{
+							continue;
+						}
 						int c = refs[i][2];
 						int r = tiles[i]->getAccumR(layer, c);
 						int g = tiles[i]->getAccumG(layer, c);
 						int b = tiles[i]->getAccumB(layer, c);
 						int root = find(i);
-						if (r > maxR[root]) maxR[root] = r;
-						if (g > maxG[root]) maxG[root] = g;
-						if (b > maxB[root]) maxB[root] = b;
+						if (r > maxR[root])
+						{
+							maxR[root] = r;
+						}
+						if (g > maxG[root])
+						{
+							maxG[root] = g;
+						}
+						if (b > maxB[root])
+						{
+							maxB[root] = b;
+						}
 						++count[root];
 					}
 					for (int i = 0; i < 4; ++i)
 					{
-						if (!tiles[i]) continue;
+						if (!tiles[i])
+						{
+							continue;
+						}
 						int root = find(i);
-						if (count[root] <= 1) continue; // singleton -> nothing to stitch
+						if (count[root] <= 1)
+						{
+							continue; // singleton -> nothing to stitch
+						}
 						tiles[i]->setAccumRGB(maxR[root], maxG[root], maxB[root], layer, refs[i][2]);
 					}
 				}

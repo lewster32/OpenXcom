@@ -71,8 +71,14 @@ inline std::uint32_t mix(int a, int b, int c, int d)
 // short-circuits the hash compare so always-lit sources stay branch-free.
 inline bool passes(double litChance, std::uint32_t hash)
 {
-	if (litChance >= 1.0) return true;
-	if (litChance <= 0.0) return false;
+	if (litChance >= 1.0)
+	{
+		return true;
+	}
+	if (litChance <= 0.0)
+	{
+		return false;
+	}
 	const double r = static_cast<double>(hash & 0xFFFFFFu) / static_cast<double>(0x1000000u);
 	return r < litChance;
 }

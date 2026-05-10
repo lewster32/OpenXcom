@@ -1162,9 +1162,18 @@ void Tile::quantiseAccumulator()
 			sumG += _accumG[l][c];
 			sumB += _accumB[l][c];
 		}
-		if (sumR > 255) sumR = 255;
-		if (sumG > 255) sumG = 255;
-		if (sumB > 255) sumB = 255;
+		if (sumR > 255)
+		{
+			sumR = 255;
+		}
+		if (sumG > 255)
+		{
+			sumG = 255;
+		}
+		if (sumB > 255)
+		{
+			sumB = 255;
+		}
 		Uint16 qR = (Uint16)(sumR >> 4);
 		Uint16 qG = (Uint16)(sumG >> 4);
 		Uint16 qB = (Uint16)(sumB >> 4);

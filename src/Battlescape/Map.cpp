@@ -1476,8 +1476,14 @@ void Map::drawTerrain(Surface *surface)
 						{
 							// density 1-15 -> tier 0-4 (3 densities per tier).
 							int tier = (tile->getSmoke() - 1) / 3;
-							if (tier < 0) tier = 0;
-							else if (tier > 4) tier = 4;
+							if (tier < 0)
+							{
+								tier = 0;
+							}
+							else if (tier > 4)
+							{
+								tier = 4;
+							}
 							Surface::blitRawBlend(surface, tmpSurface, screenPosition.x, screenPosition.y, shade, smokeTierLUTs[tier]);
 						}
 						else

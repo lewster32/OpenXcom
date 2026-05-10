@@ -226,7 +226,9 @@ void AlienDeployment::load(const YAML::YamlNodeReader& node, Mod *mod)
 		// or distinct-atmosphere terrains (MARS) that should not share the
 		// global day/night curve.
 		if (Mod::parseAmbientLightByShade(ambientNode, _ambientColorsByShade) > 0)
+		{
 			_hasAmbientLightByShade = true;
+		}
 	}
 }
 
@@ -383,8 +385,14 @@ int AlienDeployment::getMaxShade() const
  */
 void AlienDeployment::getAmbientColor(int shade, int &r, int &g, int &b) const
 {
-	if (shade < 0) shade = 0;
-	if (shade > 15) shade = 15;
+	if (shade < 0)
+	{
+		shade = 0;
+	}
+	if (shade > 15)
+	{
+		shade = 15;
+	}
 	r = _ambientColorsByShade[shade][0];
 	g = _ambientColorsByShade[shade][1];
 	b = _ambientColorsByShade[shade][2];

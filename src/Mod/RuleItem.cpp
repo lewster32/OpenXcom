@@ -1413,8 +1413,14 @@ bool RuleItem::getFullBright() const
  */
 bool RuleItem::isLitInstance(int itemId) const
 {
-	if (!Options::oxceBattleRealisticLighting) return true;
-	if (_litChance >= 1.0) return true;
+	if (!Options::oxceBattleRealisticLighting)
+	{
+		return true;
+	}
+	if (_litChance >= 1.0)
+	{
+		return true;
+	}
 	const std::uint32_t h = LightingHash::mix(itemId, 0, 0, 0);
 	return LightingHash::passes(_litChance, h);
 }
@@ -1425,8 +1431,14 @@ bool RuleItem::isLitInstance(int itemId) const
  */
 double RuleItem::getEffectiveLightIntensity(int fallbackRange) const
 {
-	if (Options::oxceBattleRealisticLighting && _hasLightIntensity) return _lightIntensity;
-	if (fallbackRange <= 0) return 0.0;
+	if (Options::oxceBattleRealisticLighting && _hasLightIntensity)
+	{
+		return _lightIntensity;
+	}
+	if (fallbackRange <= 0)
+	{
+		return 0.0;
+	}
 	return fallbackRange / 15.0;
 }
 
@@ -1447,16 +1459,28 @@ void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
 	if (lightNode["radius"])
 	{
 		int radius = lightNode["radius"].readVal<int>();
-		if (radius < 1) radius = 1;
-		if (radius > LIGHT_RADIUS_MAX) radius = LIGHT_RADIUS_MAX;
+		if (radius < 1)
+		{
+			radius = 1;
+		}
+		if (radius > LIGHT_RADIUS_MAX)
+		{
+			radius = LIGHT_RADIUS_MAX;
+		}
 		_lightRadius = radius;
 		_hasLightRadius = true;
 	}
 	if (lightNode["intensity"])
 	{
 		double intensity = lightNode["intensity"].readVal<double>();
-		if (intensity < 0.0) intensity = 0.0;
-		if (intensity > LIGHT_INTENSITY_MAX) intensity = LIGHT_INTENSITY_MAX;
+		if (intensity < 0.0)
+		{
+			intensity = 0.0;
+		}
+		if (intensity > LIGHT_INTENSITY_MAX)
+		{
+			intensity = LIGHT_INTENSITY_MAX;
+		}
 		_lightIntensity = intensity;
 		_hasLightIntensity = true;
 	}
@@ -1467,8 +1491,14 @@ void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
 	if (lightNode["litChance"])
 	{
 		double litChance = lightNode["litChance"].readVal<double>();
-		if (litChance < 0.0) litChance = 0.0;
-		if (litChance > 1.0) litChance = 1.0;
+		if (litChance < 0.0)
+		{
+			litChance = 0.0;
+		}
+		if (litChance > 1.0)
+		{
+			litChance = 1.0;
+		}
 		_litChance = litChance;
 	}
 	if (lightNode["offset"])
@@ -1477,7 +1507,9 @@ void RuleItem::loadLightBlock(const YAML::YamlNodeReader& lightNode)
 		// in TileEngine::addLight(). Sequence form [x, y, z] only; map form silently ignored.
 		std::vector<int> offset = lightNode["offset"].readVal<std::vector<int> >();
 		if (offset.size() == 3)
+		{
 			_lightOffset = Position(offset[0], offset[1], offset[2]);
+		}
 	}
 }
 

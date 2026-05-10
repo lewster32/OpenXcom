@@ -443,8 +443,14 @@ void MapData::setModLightIntensity(double value)
  */
 void MapData::setLitChance(double value)
 {
-	if (value < 0.0) value = 0.0;
-	if (value > 1.0) value = 1.0;
+	if (value < 0.0)
+	{
+		value = 0.0;
+	}
+	if (value > 1.0)
+	{
+		value = 1.0;
+	}
 	_litChance = value;
 }
 
@@ -454,7 +460,10 @@ void MapData::setLitChance(double value)
  */
 int MapData::getEffectiveLightRadius() const
 {
-	if (Options::oxceBattleRealisticLighting && _hasModLightRadius) return _modLightRadius;
+	if (Options::oxceBattleRealisticLighting && _hasModLightRadius)
+	{
+		return _modLightRadius;
+	}
 	return getLightSource();
 }
 
@@ -464,7 +473,10 @@ int MapData::getEffectiveLightRadius() const
  */
 double MapData::getEffectiveLightIntensity() const
 {
-	if (Options::oxceBattleRealisticLighting && _hasModLightIntensity) return _modLightIntensity;
+	if (Options::oxceBattleRealisticLighting && _hasModLightIntensity)
+	{
+		return _modLightIntensity;
+	}
 	return getLightSource() / 15.0;
 }
 
@@ -478,8 +490,14 @@ double MapData::getEffectiveLightIntensity() const
  */
 bool MapData::isLitInstance(Position pos, TilePart part) const
 {
-	if (!Options::oxceBattleRealisticLighting) return true;
-	if (_litChance >= 1.0) return true;
+	if (!Options::oxceBattleRealisticLighting)
+	{
+		return true;
+	}
+	if (_litChance >= 1.0)
+	{
+		return true;
+	}
 	const std::uint32_t h = LightingHash::mix(pos.x, pos.y, pos.z, static_cast<int>(part));
 	return LightingHash::passes(_litChance, h);
 }
@@ -492,7 +510,10 @@ bool MapData::isLitInstance(Position pos, TilePart part) const
  */
 Position MapData::getLightOffset() const
 {
-	if (!Options::oxceBattleRealisticLighting) return Position(0, 0, 0);
+	if (!Options::oxceBattleRealisticLighting)
+	{
+		return Position(0, 0, 0);
+	}
 	return _lightOffset;
 }
 

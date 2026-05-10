@@ -29,7 +29,7 @@ namespace
 	// bilinear's truncate would collapse all 16 sub-cell fractions to the floor;
 	// the threshold lets adjacent pixels alternate between floor and ceil based
 	// on each pixel's position, producing a stippled gradient.
-	const int bayer4[4][4] = {
+	const int BAYER_4X4[4][4] = {
 		{  0,  8,  2, 10 },
 		{ 12,  4, 14,  6 },
 		{  3, 11,  1,  9 },
@@ -45,8 +45,12 @@ namespace
 
 	void prepareFsScratch(int width)
 	{
-		auto prep = [width](std::vector<int>& v) {
-			if ((int)v.size() < width) v.resize(width);
+		auto prep = [width](std::vector<int>& v)
+		{
+			if ((int)v.size() < width)
+			{
+				v.resize(width);
+			}
 			std::fill(v.begin(), v.begin() + width, 0);
 		};
 		prep(g_errR_cur);
@@ -59,10 +63,12 @@ namespace
 }
 
 TintDither::TintDither(int mode, int spriteWidth)
-	: _mode(static_cast<Mode>(mode)), _spriteWidth(spriteWidth), _bayerRow(bayer4[0])
+	: _mode(static_cast<Mode>(mode)), _spriteWidth(spriteWidth), _bayerRow(BAYER_4X4[0])
 {
 	if (_mode != NONE && _mode != BAYER && _mode != FLOYD_STEINBERG)
+	{
 		_mode = NONE; // out-of-range option value: degrade to no-dither
+	}
 	if (_mode == FLOYD_STEINBERG)
 	{
 		prepareFsScratch(spriteWidth);
@@ -71,7 +77,7 @@ TintDither::TintDither(int mode, int spriteWidth)
 
 void TintDither::beginRow(int py)
 {
-	_bayerRow = bayer4[py & 3];
+	_bayerRow = BAYER_4X4[py & 3];
 }
 
 void TintDither::quantise(int px, int rIn, int gIn, int bIn, int &r, int &g, int &b)
@@ -84,9 +90,33 @@ void TintDither::quantise(int px, int rIn, int gIn, int bIn, int &r, int &g, int
 		const int gE = gIn + g_errG_cur[px];
 		const int bE = bIn + g_errB_cur[px];
 		// Clamped quantise: drop the 4-bit fraction, clip to [0,15].
-		r = rE >> 4; if (r > 15) r = 15; else if (r < 0) r = 0;
-		g = gE >> 4; if (g > 15) g = 15; else if (g < 0) g = 0;
-		b = bE >> 4; if (b > 15) b = 15; else if (b < 0) b = 0;
+		r = rE >> 4;
+		if (r > 15)
+		{
+			r = 15;
+		}
+		else if (r < 0)
+		{
+			r = 0;
+		}
+		g = gE >> 4;
+		if (g > 15)
+		{
+			g = 15;
+		}
+		else if (g < 0)
+		{
+			g = 0;
+		}
+		b = bE >> 4;
+		if (b > 15)
+		{
+			b = 15;
+		}
+		else if (b < 0)
+		{
+			b = 0;
+		}
 		// Residual = ideal-with-accumulated-error vs the value we actually
 		// chose (post-clamp). Folding the clamp in here keeps a saturated
 		// channel from spilling wrong-sign error into its neighbours.
@@ -129,18 +159,51 @@ void TintDither::quantise(int px, int rIn, int gIn, int bIn, int &r, int &g, int
 	if (_mode == BAYER)
 	{
 		const int t = _bayerRow[px & 3];
-		if ((rIn & 15) > t) r += 1;
-		if ((gIn & 15) > t) g += 1;
-		if ((bIn & 15) > t) b += 1;
+		if ((rIn & 15) > t)
+		{
+			r += 1;
+		}
+		if ((gIn & 15) > t)
+		{
+			g += 1;
+		}
+		if ((bIn & 15) > t)
+		{
+			b += 1;
+		}
 	}
-	if (r > 15) r = 15; if (r < 0) r = 0;
-	if (g > 15) g = 15; if (g < 0) g = 0;
-	if (b > 15) b = 15; if (b < 0) b = 0;
+	if (r > 15)
+	{
+		r = 15;
+	}
+	if (r < 0)
+	{
+		r = 0;
+	}
+	if (g > 15)
+	{
+		g = 15;
+	}
+	if (g < 0)
+	{
+		g = 0;
+	}
+	if (b > 15)
+	{
+		b = 15;
+	}
+	if (b < 0)
+	{
+		b = 0;
+	}
 }
 
 void TintDither::endRow()
 {
-	if (_mode != FLOYD_STEINBERG) return;
+	if (_mode != FLOYD_STEINBERG)
+	{
+		return;
+	}
 	// Slide the window: yesterday's "next" becomes today's "cur"; recycle
 	// yesterday's "cur" buffer to a zero-filled "next". Only zero [0, _spriteWidth)
 	// since the tail (if any) was never written by this blit.

@@ -159,7 +159,12 @@ constexpr float EMIT_SAT_FALLBACK = 0.20f;  // adjacency probe accepts pixels wi
 inline void hsvValSat(int r, int g, int b, float &v, float &s)
 {
 	int mx = std::max({ r, g, b });
-	if (mx == 0) { v = 0.0f; s = 0.0f; return; }
+	if (mx == 0)
+	{
+		v = 0.0f;
+		s = 0.0f;
+		return;
+	}
 	int mn = std::min({ r, g, b });
 	v = mx / 255.0f;
 	s = (mx - mn) / static_cast<float>(mx);
@@ -616,7 +621,11 @@ Mod::Mod() :
 	// Greyscale fallback: rgb[s] = (255 - 17*s, ...). Overridden by ambientLightByShade YAML if present.
 	for (int s = 0; s < 16; ++s)
 	{
-		int v = 255 - s * 17; if (v < 0) v = 0;
+		int v = 255 - s * 17;
+		if (v < 0)
+		{
+			v = 0;
+		}
 		_ambientColorsByShade[s][0] = v;
 		_ambientColorsByShade[s][1] = v;
 		_ambientColorsByShade[s][2] = v;
@@ -1102,8 +1111,14 @@ Palette *Mod::getPalette(const std::string &name, bool error) const
  */
 void Mod::getAmbientColor(int shade, int &r, int &g, int &b) const
 {
-	if (shade < 0) shade = 0;
-	if (shade > 15) shade = 15;
+	if (shade < 0)
+	{
+		shade = 0;
+	}
+	if (shade > 15)
+	{
+		shade = 15;
+	}
 	r = _ambientColorsByShade[shade][0];
 	g = _ambientColorsByShade[shade][1];
 	b = _ambientColorsByShade[shade][2];
@@ -1118,7 +1133,10 @@ void Mod::getAmbientColor(int shade, int &r, int &g, int &b) const
  */
 int Mod::parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable[16][3])
 {
-	if (!node || !node.isSeq()) return 0;
+	if (!node || !node.isSeq())
+	{
+		return 0;
+	}
 
 	// Anchor count is bounded only by mod-supplied YAML - duplicates and
 	// out-of-range entries are silently ignored. std::vector avoids any
@@ -1128,7 +1146,10 @@ int Mod::parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable
 	{
 		int shade = -1;
 		entry["shade"].tryReadVal(shade);
-		if (shade < 0 || shade > 15) continue;
+		if (shade < 0 || shade > 15)
+		{
+			continue;
+		}
 		int r, g, b;
 		Palette::readColor(entry["rgb"], r, g, b);
 		anchorShade.push_back(shade);
@@ -1137,17 +1158,32 @@ int Mod::parseAmbientLightByShade(const YAML::YamlNodeReader &node, int outTable
 		anchorB.push_back(b);
 	}
 	const int anchors = (int)anchorShade.size();
-	if (anchors == 0) return 0;
+	if (anchors == 0)
+	{
+		return 0;
+	}
 	for (int s = 0; s < 16; ++s)
 	{
 		int lo = -1, hi = -1;
 		for (int a = 0; a < anchors; ++a)
 		{
-			if (anchorShade[a] <= s && (lo < 0 || anchorShade[a] > anchorShade[lo])) lo = a;
-			if (anchorShade[a] >= s && (hi < 0 || anchorShade[a] < anchorShade[hi])) hi = a;
+			if (anchorShade[a] <= s && (lo < 0 || anchorShade[a] > anchorShade[lo]))
+			{
+				lo = a;
+			}
+			if (anchorShade[a] >= s && (hi < 0 || anchorShade[a] < anchorShade[hi]))
+			{
+				hi = a;
+			}
 		}
-		if (lo < 0) lo = hi;
-		if (hi < 0) hi = lo;
+		if (lo < 0)
+		{
+			lo = hi;
+		}
+		if (hi < 0)
+		{
+			hi = lo;
+		}
 		if (lo == hi)
 		{
 			outTable[s][0] = anchorR[lo];
@@ -6821,7 +6857,10 @@ void Mod::ScriptRegister(ScriptParserBase *parser)
  */
 bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g, int &b) const
 {
-	if (!frame || !palette) return false;
+	if (!frame || !palette)
+	{
+		return false;
+	}
 
 	const SDL_Color *colors = palette->getColors(0);
 	SDL_Surface *sdl = frame->getSurface();
@@ -6839,17 +6878,32 @@ bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g,
 		for (int x = 0; x < w; ++x)
 		{
 			Uint8 idx = pixels[y * pitch + x];
-			if (idx == 0) continue; // palette index 0 = transparent
+			if (idx == 0)
+			{
+				continue; // palette index 0 = transparent
+			}
 			int pr = colors[idx].r, pg = colors[idx].g, pb = colors[idx].b;
 			float vv, ss;
 			hsvValSat(pr, pg, pb, vv, ss);
 			Pixel p = { x, y, pr, pg, pb, vv, ss };
 			pix.push_back(p);
-			if (vv > maxV) maxV = vv;
+			if (vv > maxV)
+			{
+				maxV = vv;
+			}
 		}
 	}
-	if (pix.empty()) return false;
-	if (maxV <= 0.0f) { r = 0; g = 0; b = 0; return true; } // all-black sprite
+	if (pix.empty())
+	{
+		return false;
+	}
+	if (maxV <= 0.0f) // all-black sprite
+	{
+		r = 0;
+		g = 0;
+		b = 0;
+		return true;
+	}
 
 	// Step 1+2: walk the bright cluster, track the most-saturated pixel + centroid.
 	const float clusterThreshold = maxV * EMIT_BRIGHT_FRAC;
@@ -6860,10 +6914,19 @@ bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g,
 	for (size_t i = 0; i < pix.size(); ++i)
 	{
 		const Pixel &p = pix[i];
-		if (p.v < clusterThreshold) continue;
+		if (p.v < clusterThreshold)
+		{
+			continue;
+		}
 		sumX += p.x; sumY += p.y; ++clusterCount;
-		if (!clusterBest || p.s > clusterBest->s) clusterBest = &p;
-		if (!clusterBrightest || p.v > clusterBrightest->v) clusterBrightest = &p;
+		if (!clusterBest || p.s > clusterBest->s)
+		{
+			clusterBest = &p;
+		}
+		if (!clusterBrightest || p.v > clusterBrightest->v)
+		{
+			clusterBrightest = &p;
+		}
 	}
 	if (clusterBest && clusterBest->s >= EMIT_SAT_PRIMARY)
 	{
@@ -6882,12 +6945,30 @@ bool Mod::deriveRGBFromSurface(Surface *frame, Palette *palette, int &r, int &g,
 		for (size_t i = 0; i < pix.size(); ++i)
 		{
 			const Pixel &p = pix[i];
-			int dx = p.x - cxRound; if (dx < 0) dx = -dx;
-			int dy = p.y - cyRound; if (dy < 0) dy = -dy;
-			if (dx > EMIT_NB_RADIUS || dy > EMIT_NB_RADIUS) continue;
-			if (p.s < EMIT_SAT_FALLBACK) continue;
+			int dx = p.x - cxRound;
+			if (dx < 0)
+			{
+				dx = -dx;
+			}
+			int dy = p.y - cyRound;
+			if (dy < 0)
+			{
+				dy = -dy;
+			}
+			if (dx > EMIT_NB_RADIUS || dy > EMIT_NB_RADIUS)
+			{
+				continue;
+			}
+			if (p.s < EMIT_SAT_FALLBACK)
+			{
+				continue;
+			}
 			float score = p.s * p.v;
-			if (!nearbyBest || score > nearbyScore) { nearbyBest = &p; nearbyScore = score; }
+			if (!nearbyBest || score > nearbyScore)
+			{
+				nearbyBest = &p;
+				nearbyScore = score;
+			}
 		}
 		if (nearbyBest)
 		{
@@ -6933,12 +7014,20 @@ void Mod::autoDeriveLightColors()
 	for (std::map<std::string, RuleItem*>::iterator it = _items.begin(); it != _items.end(); ++it)
 	{
 		RuleItem *item = it->second;
-		if (item->getBattleType() != BT_FLARE) continue;
+		if (item->getBattleType() != BT_FLARE)
+		{
+			continue;
+		}
 		Surface *frame = floorob ? floorob->getFrame(item->getFloorSprite()) : 0;
-		if (!frame) continue;
+		if (!frame)
+		{
+			continue;
+		}
 		int r, g, b;
 		if (deriveRGBFromSurface(frame, pal, r, g, b))
+		{
 			item->setLightColor(r, g, b);
+		}
 	}
 
 	// MapData parts: any part that has a light source on either track.
@@ -6946,18 +7035,32 @@ void Mod::autoDeriveLightColors()
 	{
 		MapDataSet *set = it->second;
 		SurfaceSet *surf = set->getSurfaceset();
-		if (!surf) continue;
+		if (!surf)
+		{
+			continue;
+		}
 		size_t count = set->getSize();
 		for (size_t i = 0; i < count; ++i)
 		{
 			MapData *md = set->getObject(i);
-			if (!md) continue;
-			if (!md->hasAnyLightSource()) continue;
+			if (!md)
+			{
+				continue;
+			}
+			if (!md->hasAnyLightSource())
+			{
+				continue;
+			}
 			Surface *frame = surf->getFrame(md->getSprite(0));
-			if (!frame) continue;
+			if (!frame)
+			{
+				continue;
+			}
 			int r, g, b;
 			if (deriveRGBFromSurface(frame, pal, r, g, b))
+			{
 				md->setLightColor(r, g, b);
+			}
 		}
 	}
 }
@@ -6977,7 +7080,10 @@ void Mod::reloadLightingRules()
 	{
 		MapDataSet *ds = dsPair.second;
 		auto *objs = ds->getObjectsRaw();
-		if (!objs) continue;
+		if (!objs)
+		{
+			continue;
+		}
 		for (MapData *md : *objs)
 		{
 			if (md)
@@ -6996,7 +7102,11 @@ void Mod::reloadLightingRules()
 	// entries fall back correctly. Mirrors the initialisation in Mod::Mod().
 	for (int s = 0; s < 16; ++s)
 	{
-		int v = 255 - s * 17; if (v < 0) v = 0;
+		int v = 255 - s * 17;
+		if (v < 0)
+		{
+			v = 0;
+		}
 		_ambientColorsByShade[s][0] = v;
 		_ambientColorsByShade[s][1] = v;
 		_ambientColorsByShade[s][2] = v;
@@ -7058,9 +7168,15 @@ void Mod::reloadLightingRules()
 					{
 						std::string type;
 						patchEntry.tryRead("type", type);
-						if (type.empty()) continue;
+						if (type.empty())
+						{
+							continue;
+						}
 						auto dsIt = _mapDataSets.find(type);
-						if (dsIt == _mapDataSets.end()) continue;
+						if (dsIt == _mapDataSets.end())
+						{
+							continue;
+						}
 
 						try
 						{
