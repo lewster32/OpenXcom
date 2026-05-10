@@ -45,6 +45,27 @@ enum LightLayers : Uint8;
 
 
 /**
+ * Parameters for a single light source emission. Built by the calculate*Lighting
+ * drivers from the winning emitter (mod-supplied tile entry, fire, item glow,
+ * unit personal light, hand-weapon glow) and passed into TileEngine::addLight.
+ *
+ * Defaults preserve vanilla behaviour: white light, LOS-respecting, no offset,
+ * zero intensity (only the radius matters when oxceBattleRealisticLighting is off).
+ *
+ * See docs/lighting-pipeline.md for the source-spec contract that fills this in.
+ */
+struct LightParams
+{
+	int radius = 0;                            ///< Vanilla scalar power. 0 disables the source.
+	double intensity = 0.0;                    ///< Realistic-lighting scalar; <=0 disables when realistic is on.
+	int lightR = 255;                          ///< Light source red channel (0..255). Realistic-lighting only.
+	int lightG = 255;                          ///< Light source green channel (0..255). Realistic-lighting only.
+	int lightB = 255;                          ///< Light source blue channel (0..255). Realistic-lighting only.
+	bool bypassLOS = false;                    ///< Vanilla flashlight wrap-around hint; ignored when realistic is on.
+	Position lightOffset = Position(0, 0, 0);  ///< Voxel-space delta from the natural source centre. See addLight doc comment for resolution caveats.
+};
+
+/**
  * A utility class that modifies tile properties on a battlescape map. This includes lighting, destruction, smoke, fire, fog of war.
  * Note that this function does not handle any sounds or animations.
  */
@@ -129,11 +150,10 @@ private:
 	std::vector<BattleUnit*> _movingUnitPrev;
 	BattleUnit* _movingUnit = nullptr;
 
-	/// Add light source with optional per-source RGB tint, LOS-bypass flag and voxel-space emitter offset.
-	/// Defaults preserve vanilla behaviour (white light, LOS-respecting, no offset).
-	void addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
-	              int lightR = 255, int lightG = 255, int lightB = 255,
-	              bool bypassLOS = false, Position lightOffset = Position(0, 0, 0));
+	/// Add light source. Source spec (radius, intensity, RGB, bypassLOS, lightOffset)
+	/// is bundled in LightParams; gs/center/layer are the world-side targeting.
+	/// See LightParams above and docs/lighting-pipeline.md for the contracts.
+	void addLight(MapSubset gs, Position center, LightLayers layer, const LightParams& params);
 	/// Calculate blockage amount.
 	int blockage(Tile *tile, const TilePart part, ItemDamageType type, int direction = -1, bool checkingFromOrigin = false);
 

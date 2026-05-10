@@ -25,10 +25,17 @@
 #include "Exception.h"
 #include "FileMap.h"
 #include "Logger.h"
+#include "OkLab.h"
 #include "Yaml.h"
 
 namespace
 {
+
+// Single source of truth for the perceptual colour math (sRGB <-> linear,
+// rgbToOKLab) lives in Engine/OkLab.h. Bring those helpers into this TU's
+// anonymous namespace via using-directive so the existing call sites
+// (nearestIndexOKLab, ensureOKLabCache, getTintLUT) keep working unqualified.
+using namespace OpenXcom::OkLab;
 
 inline int sqrDist(const SDL_Color &a, const SDL_Color &b)
 {
@@ -55,44 +62,6 @@ Uint8 nearestIndex(const SDL_Color *colors, const SDL_Color &target, int firstCo
 		}
 	}
 	return (Uint8)best;
-}
-
-// sRGB byte [0..255] -> linear [0..1]. Standard sRGB curve, piecewise linear below
-// 0.04045 and gamma 2.4 above. Used to convert palette and cell-RGB into linear-light
-// space before multiplication, then re-encoded for nearest-palette search.
-inline double srgbToLinear(int c)
-{
-	double f = c / 255.0;
-	return f <= 0.04045 ? f / 12.92 : std::pow((f + 0.055) / 1.055, 2.4);
-}
-
-// Linear [0..1] -> sRGB byte [0..255]. Inverse of srgbToLinear with rounded byte
-// output and clamps at the extremes.
-inline int linearToSrgb(double c)
-{
-	if (c <= 0.0) return 0;
-	if (c >= 1.0) return 255;
-	double f = c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1.0 / 2.4) - 0.055;
-	return (int)std::lround(f * 255.0);
-}
-
-// sRGB byte triple -> OKLab triple. See https://bottosson.github.io/posts/oklab/
-// Better than CIELAB in the blue region and cheap (one cbrt per channel). Output L
-// is in [0..1]-ish; a/b are small-magnitude signed floats.
-inline void rgbToOKLab(int r, int g, int b, float &L, float &A, float &B)
-{
-	double lr = srgbToLinear(r);
-	double lg = srgbToLinear(g);
-	double lb = srgbToLinear(b);
-	double l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
-	double m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
-	double s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
-	double lc = std::cbrt(l);
-	double mc = std::cbrt(m);
-	double sc = std::cbrt(s);
-	L = (float)( 0.2104542553 * lc + 0.7936177850 * mc - 0.0040720468 * sc);
-	A = (float)( 1.9779984951 * lc - 2.4285922050 * mc + 0.4505937099 * sc);
-	B = (float)( 0.0259040371 * lc + 0.7827717662 * mc - 0.8086757660 * sc);
 }
 
 // Search-by-OKLab-distance restricted to [firstColor, lastColor]. Mirrors
@@ -125,6 +94,11 @@ Uint8 nearestIndexOKLab(const OpenXcom::Palette &pal, int targetR, int targetG, 
 
 namespace OpenXcom
 {
+
+// Lift OkLab math into OpenXcom for the Palette member functions
+// (Palette::getTintLUT, Palette::ensureOKLabCache) that call srgbToLinear,
+// linearToSrgb and rgbToOKLab unqualified. Source of truth: Engine/OkLab.h.
+using namespace OkLab;
 
 /**
  * Initializes a brand new palette.

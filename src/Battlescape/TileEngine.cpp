@@ -1099,7 +1099,14 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			{
 				currLight = getMaxStaticLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_FIRE, winR, winG, winB, false, winOffset);
+			LightParams params;
+			params.radius = currLight;
+			params.intensity = winIntensity;
+			params.lightR = winR;
+			params.lightG = winG;
+			params.lightB = winB;
+			params.lightOffset = winOffset;
+			addLight(gs, tile->getPosition(), LL_FIRE, params);
 		}
 	);
 }
@@ -1148,7 +1155,14 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 			{
 				currLight = getMaxDynamicLightDistance() - 1;
 			}
-			addLight(gs, tile->getPosition(), currLight, winIntensity, LL_ITEMS, winR, winG, winB, false, winOffset);
+			LightParams params;
+			params.radius = currLight;
+			params.intensity = winIntensity;
+			params.lightR = winR;
+			params.lightG = winG;
+			params.lightB = winB;
+			params.lightOffset = winOffset;
+			addLight(gs, tile->getPosition(), LL_ITEMS, params);
 		}
 	);
 }
@@ -1255,7 +1269,15 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			for (int y = 0; y < size; ++y)
 			{
-				addLight(gs, pos + Position(x, y, 0), currLight, winIntensity, LL_UNITS, winR, winG, winB, winBypassLOS, winOffset);
+				LightParams params;
+				params.radius = currLight;
+				params.intensity = winIntensity;
+				params.lightR = winR;
+				params.lightG = winG;
+				params.lightB = winB;
+				params.bypassLOS = winBypassLOS;
+				params.lightOffset = winOffset;
+				addLight(gs, pos + Position(x, y, 0), LL_UNITS, params);
 			}
 		}
 	}
@@ -1757,22 +1779,25 @@ void TileEngine::recalculateLighting()
  * @param radius       Throw distance in tiles. radius <= 0 short-circuits.
  * @param intensity    Realistic-lighting centre brightness in [0.0, 5.0].
  *                     0.0 short-circuits when realistic; ignored otherwise.
- * @param layer        One of LL_AMBIENT, LL_FIRE, LL_ITEMS, LL_UNITS.
- * @param lightR/G/B   Light source colour in 0-255 per channel. Realistic-lighting only.
- * @param bypassLOS    If true and realistic lighting is off, light wraps
- *                     around walls (vanilla flashlight behaviour).
- * @param lightOffset  Realistic-lighting sub-tile source offset in voxels, applied as a
- *                     delta from the natural source centre. The LOS trace works on a coarser grid
- *                     of `divide` voxels per step (8 for LL_FIRE, 4 for LL_ITEMS / LL_UNITS), so
- *                     offsets smaller than `divide` round to zero. Offsets approaching half a tile
- *                     can push the source into a neighbour tile and cause the LOS trace to start
- *                     from the wrong cell - if you want the light to emanate from a wall surface,
- *                     prefer the MCDPatch on the wall tile itself rather than a large offset.
+ * @param layer   One of LL_AMBIENT, LL_FIRE, LL_ITEMS, LL_UNITS.
+ * @param params  Source spec bundle - radius, intensity, RGB, bypassLOS, lightOffset.
+ *                See LightParams in TileEngine.h.
+ *                lightOffset is a voxel-space delta from the natural source centre.
+ *                The LOS trace works on a coarser grid of `divide` voxels per step
+ *                (8 for LL_FIRE, 4 for LL_ITEMS / LL_UNITS), so offsets smaller than
+ *                `divide` round to zero. Offsets approaching half a tile can push the
+ *                source into a neighbour tile and cause the LOS trace to start from
+ *                the wrong cell - if you want the light to emanate from a wall surface,
+ *                prefer the MCDPatch on the wall tile itself rather than a large offset.
  */
-void TileEngine::addLight(MapSubset gs, Position center, int radius, double intensity, LightLayers layer,
-                          int lightR, int lightG, int lightB,
-                          bool bypassLOS, Position lightOffset)
+void TileEngine::addLight(MapSubset gs, Position center, LightLayers layer, const LightParams& params)
 {
+	const int radius = params.radius;
+	const double intensity = params.intensity;
+	const int lightR = params.lightR;
+	const int lightG = params.lightG;
+	const int lightB = params.lightB;
+	const bool bypassLOS = params.bypassLOS;
 	// Vanilla mode: only radius gates the source; intensity / lightOffset are
 	// realistic-lighting inputs and are ignored.
 	const bool realistic = Options::oxceBattleRealisticLighting;
@@ -1780,10 +1805,7 @@ void TileEngine::addLight(MapSubset gs, Position center, int radius, double inte
 	{
 		return;
 	}
-	if (!realistic)
-	{
-		lightOffset = Position(0, 0, 0);
-	}
+	Position lightOffset = realistic ? params.lightOffset : Position(0, 0, 0);
 
 	const auto fire = layer == LL_FIRE;
 	const auto items = layer == LL_ITEMS;

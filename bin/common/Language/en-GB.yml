@@ -226,7 +226,7 @@ en-GB:
   STR_SMOKE_OPACITY_DESC: "Controls how translucent smoke appears. 100 is fully opaque (classic); lower values make it easier to see through."
   STR_SMOKE_OPACITY_MIN: "Min smoke opacity"
   STR_SMOKE_OPACITY_MIN_DESC: "Makes smoke more translucent at lower densities. 100 keeps all smoke fully opaque (classic)."
-  STR_REALISTIC_LIGHTING: "Advanced lighting"
+  STR_REALISTIC_LIGHTING: "Realistic lighting"
   STR_REALISTIC_LIGHTING_DESC: "Makes lighting behave more naturally, including colours, shadows, bounce light and more."
   STR_COLOUR_LIGHT_ALLOW_OVERRIDE: "Allow modded lights"
   STR_COLOUR_LIGHT_ALLOW_OVERRIDE_DESC: "Rulesets may declare explicit light settings per source."
